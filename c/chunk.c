@@ -4,7 +4,7 @@
 #include "memory.h"
 #include "vm.h"
 
-void initChunk(Chunk* chunk) {
+void initChunk(Chunk *chunk) {
   chunk->count = 0;
   chunk->capacity = 0;
   chunk->code = NULL;
@@ -12,18 +12,18 @@ void initChunk(Chunk* chunk) {
   initValueArray(&chunk->constants);
 }
 
-void freeChunk(Chunk* chunk) {
+void freeChunk(Chunk *chunk) {
   FREE_ARRAY(uint8_t, chunk->code, chunk->capacity); // reallocate(chunk->code, sizeof(uint8_t) * (chunk->capacity), 0)
-    FREE_ARRAY(int, chunk->lines, chunk->capacity); // reallocate(chunk->lines, sizeof(int) * (chunk->capacity), 0)
-    freeValueArray(&chunk->constants);
-    initChunk(chunk);
+  FREE_ARRAY(int, chunk->lines, chunk->capacity); // reallocate(chunk->lines, sizeof(int) * (chunk->capacity), 0)
+  freeValueArray(&chunk->constants);
+  initChunk(chunk);
 }
 
 
 /* chunks of bytecode write-chunk < chunks of bytecode write-chunk-with-line
 void writechunk(chunk* chunk, uint8_t byte) {
 */
-void writeChunk(Chunk* chunk, uint8_t byte, int line) {
+void writeChunk(Chunk *chunk, uint8_t byte, int line) {
   // メモリ容量が足りないなら新しく確保する
   if (chunk->capacity < chunk->count + 1) {
     int oldCapacity = chunk->capacity;
@@ -37,7 +37,7 @@ void writeChunk(Chunk* chunk, uint8_t byte, int line) {
   chunk->count++;
 }
 
-int addConstant(Chunk* chunk, Value value) {
+int addConstant(Chunk *chunk, Value value) {
   push(value);
   writeValueArray(&chunk->constants, value);
   pop();

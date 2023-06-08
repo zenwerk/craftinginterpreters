@@ -22,11 +22,14 @@
     reallocate(pointer, sizeof(type) * (oldCount), 0)
 
 // メモリ管理関数 (fin-lang の alloc_func に通じるものがある)
-void* reallocate(void* pointer, size_t oldSize, size_t newSize);
+void *reallocate(void *pointer, size_t oldSize, size_t newSize);
 
-void markObject(Obj* object);
+void markObject(Obj *object);
+
 void markValue(Value value);
+
 void collectGarbage();
+
 void freeObjects();
 
 #endif

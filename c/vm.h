@@ -18,11 +18,12 @@ typedef struct {
 /* Calls and Functions call-frame < Closures call-frame-closure
   ObjFunction* function;
 */
-  ObjClosure* closure;
-  uint8_t* ip;
-  Value* slots;
+  ObjClosure *closure;
+  uint8_t *ip;
+  Value *slots;
 } CallFrame;
 
+// 仮想マシン
 typedef struct {
 /* A Virtual Machine vm-h < Calls and Functions frame-array
   Chunk* chunk;
@@ -32,20 +33,20 @@ typedef struct {
 */
   CallFrame frames[FRAMES_MAX];
   int frameCount;
-  
+
   Value stack[STACK_MAX];
-  Value* stackTop;
+  Value *stackTop;
   Table globals;
   Table strings;
-  ObjString* initString;
-  ObjUpvalue* openUpvalues;
+  ObjString *initString;
+  ObjUpvalue *openUpvalues;
 
   size_t bytesAllocated;
   size_t nextGC;
-  Obj* objects;
+  Obj *objects;
   int grayCount;
   int grayCapacity;
-  Obj** grayStack;
+  Obj **grayStack;
 } VM;
 
 typedef enum {
@@ -57,12 +58,16 @@ typedef enum {
 extern VM vm;
 
 void initVM();
+
 void freeVM();
+
 /* A Virtual Machine interpret-h < Scanning on Demand vm-interpret-h
 InterpretResult interpret(Chunk* chunk);
 */
-InterpretResult interpret(const char* source);
+InterpretResult interpret(const char *source);
+
 void push(Value value);
+
 Value pop();
 
 #endif

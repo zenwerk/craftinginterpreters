@@ -87,16 +87,21 @@ typedef struct {
 
 #endif
 
+// Value を保存するための動的配列（定数プールや即値をおいておく場所？）
 typedef struct {
   int capacity;
   int count;
-  Value* values;
+  Value *values;
 } ValueArray;
 
 bool valuesEqual(Value a, Value b);
-void initValueArray(ValueArray* array);
-void writeValueArray(ValueArray* array, Value value);
-void freeValueArray(ValueArray* array);
+
+void initValueArray(ValueArray *array);
+
+void writeValueArray(ValueArray *array, Value value);
+
+void freeValueArray(ValueArray *array);
+
 void printValue(Value value);
 
 #endif

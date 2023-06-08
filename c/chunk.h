@@ -48,17 +48,20 @@ typedef enum {
 typedef struct {
   int count;    // 実際に使用している容量
   int capacity; // 割り当てられている容量
-  uint8_t* code;
-  int* lines;
+  uint8_t *code;
+  int *lines;
   ValueArray constants;
 } Chunk;
 
-void initChunk(Chunk* chunk);
-void freeChunk(Chunk* chunk);
+void initChunk(Chunk *chunk);
+
+void freeChunk(Chunk *chunk);
+
 /* Chunks of Bytecode write-chunk-h < Chunks of Bytecode write-chunk-with-line-h
 void writeChunk(Chunk* chunk, uint8_t byte);
 */
-void writeChunk(Chunk* chunk, uint8_t byte, int line);
-int addConstant(Chunk* chunk, Value value);
+void writeChunk(Chunk *chunk, uint8_t byte, int line);
+
+int addConstant(Chunk *chunk, Value value);
 
 #endif
