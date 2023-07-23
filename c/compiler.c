@@ -11,36 +11,38 @@
 #include "debug.h"
 #endif
 
+// Parser はパーサーを表す.
 typedef struct {
-  Token current;
-  Token previous;
+  Token current;  // 現在読み込んでいる字句
+  Token previous; // 一つ前の字句
   bool hadError;
-  bool panicMode;
+  bool panicMode; // エラーの雪崩を回避するためのモード
 } Parser;
 
+// Precedence は演算子の優先順位を表す.
+// 優先順位が低いものから高い順に並んでいる.
 typedef enum {
   PREC_NONE,
-  PREC_ASSIGNMENT,  // =
-  PREC_OR,          // or
-  PREC_AND,         // and
-  PREC_EQUALITY,    // == !=
-  PREC_COMPARISON,  // < > <= >=
-  PREC_TERM,        // + -
-  PREC_FACTOR,      // * /
-  PREC_UNARY,       // ! -
-  PREC_CALL,        // . ()
+  PREC_ASSIGNMENT,  // =          代入は最も優先順位が低い -> canAssign フラグの必要性が生じる
+  PREC_OR,          // or         論理OR
+  PREC_AND,         // and        論理AND
+  PREC_EQUALITY,    // == !=      論理比較
+  PREC_COMPARISON,  // < > <= >=  数値比較
+  PREC_TERM,        // + -        二項演算+-
+  PREC_FACTOR,      // * /        二項演算*/
+  PREC_UNARY,       // ! -        単項演算子
+  PREC_CALL,        // . ()       グルーピング
   PREC_PRIMARY
 } Precedence;
 
-/* Compiling Expressions parse-fn-type < Global Variables parse-fn-type
-typedef void (*ParseFn)();
-*/
 typedef void (*ParseFn)(bool canAssign);
 
+// ParseRule は構文解析のルールを表す
+// あるトークンが与えられたときに...
 typedef struct {
-  ParseFn prefix;
-  ParseFn infix;
-  Precedence precedence;
+  ParseFn prefix;  // その型のトークンで始まる接頭辞式をコンパイルする関数
+  ParseFn infix;   // 左オペランドにその型のトークンが続くinfix式をコンパイルする関数
+  Precedence precedence; // そのトークンを演算子として使用するinfix式の優先順位
 } ParseRule;
 
 typedef struct {
@@ -78,8 +80,8 @@ typedef struct ClassCompiler {
   bool hasSuperclass;
 } ClassCompiler;
 
-Parser parser;
-Compiler *current = NULL;
+Parser parser; // パーサーはグローバル変数で管理.
+Compiler *current = NULL; // current は現在有効なCompiler構造体を示す.
 ClassCompiler *currentClass = NULL;
 
 /* Compiling Expressions compiling-chunk < Calls and Functions current-chunk
@@ -95,8 +97,9 @@ static Chunk *currentChunk() {
 }
 
 static void errorAt(Token *token, const char *message) {
+  // すでに構文エラーが発生しているなら後続のエラーは無視する
   if (parser.panicMode) return;
-  parser.panicMode = true;
+  parser.panicMode = true; // 構文エラー発生フラグをON
   fprintf(stderr, "[line %d] Error", token->line);
 
   if (token->type == TOKEN_EOF) {
@@ -119,17 +122,24 @@ static void errorAtCurrent(const char *message) {
   errorAt(&parser.current, message);
 }
 
+// (パーサー) advance は字句を一つ読み込み, パーサーに現在解析中の字句として設定する
 static void advance() {
+  // 既存の字句を一つ前の字句に移動する
   parser.previous = parser.current;
 
   for (;;) {
+    // スキャナを進め解析中の字句を更新する
     parser.current = scanToken();
-    if (parser.current.type != TOKEN_ERROR) break;
+    // エラーでなければ抜ける
+    if (parser.current.type != TOKEN_ERROR)
+      break;
 
     errorAtCurrent(parser.current.start);
   }
 }
 
+// (パーサー) consume は現在の字句が指定されたTokenTypeか調べ, そうであれば字句を一つ読み込む.
+// 違う場合はエラーメッセージを表示しパースエラー状態となる.
 static void consume(TokenType type, const char *message) {
   if (parser.current.type == type) {
     advance();
@@ -139,10 +149,13 @@ static void consume(TokenType type, const char *message) {
   errorAtCurrent(message);
 }
 
+// check はパーサーの現在の字句が指定された種類かチェックし真偽値を返す.
 static bool check(TokenType type) {
   return parser.current.type == type;
 }
 
+// match はパーサーの現在の字句が指定された種類か確認し真偽値を返す.
+// 指定された字句だった場合, パーサーは新たな字句を一つ読み込む.
 static bool match(TokenType type) {
   if (!check(type)) return false;
   advance();
@@ -1154,7 +1167,7 @@ ObjFunction *compile(const char *source) {
   parser.hadError = false;
   parser.panicMode = false;
 
-  advance();
+  advance(); // 最初の字句を解析しパーサーに設定する.
 /* Compiling Expressions compile-chunk < Global Variables compile
   expression();
   consume(TOKEN_EOF, "Expect end of expression.");

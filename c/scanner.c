@@ -32,11 +32,13 @@ static bool isAtEnd() {
   return *scanner.current == '\0';
 }
 
+// (スキャナ) advance はスキャナが現在指している文字を返し, スキャナの読み込み先を一つ進める.
 static char advance() {
   scanner.current++;
   return scanner.current[-1];
 }
 
+// 現在のスキャナが指している文字を取得し返す.
 static char peek() {
   return *scanner.current;
 }
@@ -98,16 +100,19 @@ static void skipWhitespace() {
   }
 }
 
-static TokenType checkKeyword(int start, int length,
-                              const char *rest, TokenType type) {
+static TokenType checkKeyword(int start, int length, const char *rest, TokenType type) {
+  // (スキャナの現在位置 - スキャナの解析開始位置) はポインタのアドレス値を減算しているのでint(size_t)となるので
+  // 引数の (開始位置 + 長さ) と比較し同じであることは, TODO: スキャンしている文字列が特定の長さかどうかを確認しているのか? memcpy は重いから.
   if (scanner.current - scanner.start == start + length &&
       memcmp(scanner.start + start, rest, length) == 0) {
+    // スキャナの開始位置+offset から length分の文字列が rest で指定された内容と同じなら特定の予約語である.
     return type;
   }
 
   return TOKEN_IDENTIFIER;
 }
 
+// identifierType は lox の予約語か識別子かを解析し字句を返す
 static TokenType identifierType() {
   switch (scanner.start[0]) {
     case 'a':
@@ -160,7 +165,8 @@ static TokenType identifierType() {
 }
 
 static Token identifier() {
-  while (isAlpha(peek()) || isDigit(peek())) advance();
+  while (isAlpha(peek()) || isDigit(peek()))
+    advance();
   return makeToken(identifierType());
 }
 
@@ -186,21 +192,26 @@ static Token string() {
 
   if (isAtEnd()) return errorToken("Unterminated string.");
 
-  // The closing quote.
+  // The closing quote(").
   advance();
   return makeToken(TOKEN_STRING);
 }
 
 Token scanToken() {
   skipWhitespace();
+  // 読み込み開始位置を設定する.
   scanner.start = scanner.current;
 
+  // Null終端文字なら終わり
   if (isAtEnd()) return makeToken(TOKEN_EOF);
 
   char c = advance();
+  // アルファベットなら識別子.
   if (isAlpha(c)) return identifier();
+  // 数値なら数.
   if (isDigit(c)) return number();
 
+  // 各種記号
   switch (c) {
     case '(':
       return makeToken(TOKEN_LEFT_PAREN);

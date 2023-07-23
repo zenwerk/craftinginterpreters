@@ -23,6 +23,7 @@ typedef enum {
   TOKEN_ERROR, TOKEN_EOF
 } TokenType;
 
+// Token はスキャナが読み込む字句一つを表す
 typedef struct {
   TokenType type;
   const char *start;
