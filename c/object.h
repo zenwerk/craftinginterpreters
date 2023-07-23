@@ -37,10 +37,12 @@ typedef enum {
   OBJ_UPVALUE
 } ObjType;
 
+// Obj はすべてのオブジェクトの基礎を表す構造体.
+// 各オブジェクトは先頭に Obj を埋め込みメモリ構造を共通化する.
 struct Obj {
-  ObjType type;
-  bool isMarked;
-  struct Obj *next;
+  ObjType type; // オブジェクトの種類
+  bool isMarked; // mark-sweep の目印
+  struct Obj *next; // 連結リスト用
 };
 
 typedef struct {
@@ -60,9 +62,9 @@ typedef struct {
 
 struct ObjString {
   Obj obj;
-  int length;
-  char *chars;
-  uint32_t hash;
+  int length; // 文字列の長さ
+  char *chars; // 実際の文字列
+  uint32_t hash; // 文字列のハッシュ値(毎回計算する必要がないようにメモ化しておく)
 };
 typedef struct ObjUpvalue {
   Obj obj;

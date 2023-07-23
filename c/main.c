@@ -120,9 +120,7 @@ int main(int argc, const char *argv[]) {
   }
 
   freeVM();
-/* A Virtual Machine main-free-vm < Scanning on Demand args
-  freeVM();
-*/
+
 /* Chunks of Bytecode main-chunk < Scanning on Demand args
   freeChunk(&chunk);
 */

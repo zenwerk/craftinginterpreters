@@ -19,10 +19,7 @@ void freeChunk(Chunk *chunk) {
   initChunk(chunk);
 }
 
-
-/* chunks of bytecode write-chunk < chunks of bytecode write-chunk-with-line
-void writechunk(chunk* chunk, uint8_t byte) {
-*/
+// writeChunk は指定されたChunk配列にバイトコードを追加する
 void writeChunk(Chunk *chunk, uint8_t byte, int line) {
   // メモリ容量が足りないなら新しく確保する
   if (chunk->capacity < chunk->count + 1) {

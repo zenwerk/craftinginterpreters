@@ -10,13 +10,14 @@
 #include "memory.h"
 #include "vm.h"
 
-VM vm; // [one]
+VM vm; // VMはグローバル変数. clox の実行はこのグローバル変数のVMが行う.
 static Value clockNative(int argCount, Value *args) {
   return NUMBER_VAL((double) clock() / CLOCKS_PER_SEC);
 }
 
+// resetStack はグローバル変数vmのスタックを初期化する
 static void resetStack() {
-  vm.stackTop = vm.stack;
+  vm.stackTop = vm.stack; // スタックポインタを先頭に.
   vm.frameCount = 0;
   vm.openUpvalues = NULL;
 }
@@ -67,6 +68,7 @@ static void defineNative(const char *name, NativeFn function) {
   pop();
 }
 
+// グローバル変数vmを初期化し, 実行の準備を行う
 void initVM() {
   resetStack();
   vm.objects = NULL;
@@ -93,17 +95,22 @@ void freeVM() {
   freeObjects();
 }
 
+// push はグローバル変数vmのスタックに引数の値をpushし, スタックポインタを一つ進める.
 void push(Value value) {
   *vm.stackTop = value;
   vm.stackTop++;
 }
 
+// pop はグローバル変数vmのスタックポインタを一つ戻し, そこが指す値(Value)を返す.
 Value pop() {
+  // popしたスタックポインタが指している値を上書きすればスタック上の値を破棄したことと同じとみなせる
   vm.stackTop--;
   return *vm.stackTop;
 }
 
+// peek はグローバル変数vmのスタックを先頭から引数して指定された箇所の値を返す
 static Value peek(int distance) {
+  // 先頭のスタックポインタは常に一つ先の空の領域を指しているので, -1 して先頭の値からカウントさせる.
   return vm.stackTop[-1 - distance];
 }
 
@@ -676,6 +683,7 @@ InterpretResult interpret(Chunk* chunk) {
   vm.ip = vm.chunk->code;
   return run();
 */
+// interpret は入力された lox 言語を実行する入り口.
 InterpretResult interpret(const char *source) {
 /* Scanning on Demand vm-interpret-c < Compiling Expressions interpret-chunk
   compile(source);

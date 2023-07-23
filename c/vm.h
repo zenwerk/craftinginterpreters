@@ -19,7 +19,7 @@ typedef struct {
   ObjFunction* function;
 */
   ObjClosure *closure;
-  uint8_t *ip;
+  uint8_t *ip; // 命令ポインタ(現在のバイトコード命令のアドレスを指す) -> 実行中のプログラムの「現在地」とも言える
   Value *slots;
 } CallFrame;
 
@@ -34,10 +34,10 @@ typedef struct {
   CallFrame frames[FRAMES_MAX];
   int frameCount;
 
-  Value stack[STACK_MAX];
-  Value *stackTop;
-  Table globals;
-  Table strings;
+  Value stack[STACK_MAX]; // デフォルトで (64*(255+1))
+  Value *stackTop; // スタックポインタ
+  Table globals; // グローバル変数
+  Table strings; // 文字列プール
   ObjString *initString;
   ObjUpvalue *openUpvalues;
 
@@ -55,7 +55,7 @@ typedef enum {
   INTERPRET_RUNTIME_ERROR
 } InterpretResult;
 
-extern VM vm;
+extern VM vm; // グローバル変数vmを参照できるように.
 
 void initVM();
 
