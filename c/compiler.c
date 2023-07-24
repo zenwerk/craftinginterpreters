@@ -177,6 +177,7 @@ static void emitBytes(uint8_t byte1, uint8_t byte2) {
 static void emitLoop(int loopStart) {
   emitByte(OP_LOOP);
 
+  // +2 は OP_LOOP命令自身のサイズを考慮したオフセット.
   int offset = currentChunk()->count - loopStart + 2;
   if (offset > UINT16_MAX) error("Loop body too large.");
 
@@ -184,10 +185,15 @@ static void emitLoop(int loopStart) {
   emitByte(offset & 0xff);
 }
 
+// emitJump はジャンプ命令を出力する
 static int emitJump(uint8_t instruction) {
   emitByte(instruction);
+  // ジャンプ先のアドレスは 0xffff で仮置きしておく.
+  // 後ほど patchJump 関数で実際のオペランドの値に置換する必要がある.
   emitByte(0xff);
   emitByte(0xff);
+  // 現在のバイトコードの 2byte 前のアドレス値を返しておく.
+  // 後からこのアドレスから 2byte 置換する.
   return currentChunk()->count - 2;
 }
 
@@ -219,13 +225,16 @@ static void emitConstant(Value value) {
 }
 
 static void patchJump(int offset) {
+  // jump先のアドレス.
   // -2 to adjust for the bytecode for the jump offset itself.
+  // jumpオフセット自身の分を調整するため -2 する.
   int jump = currentChunk()->count - offset - 2;
 
   if (jump > UINT16_MAX) {
     error("Too much code to jump over.");
   }
 
+  // 0xffff で仮置きしていたオペランドを実際のjump先に置換する
   currentChunk()->code[offset] = (jump >> 8) & 0xff;
   currentChunk()->code[offset + 1] = jump & 0xff;
 }
