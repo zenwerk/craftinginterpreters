@@ -387,18 +387,24 @@ static InterpretResult run() {
         pop();
         break;
       case OP_GET_LOCAL: {
+        // ローカル変数のロード
+
+        // ローカル変数が存在するスタックidxを1byteオペランドで取る
         uint8_t slot = READ_BYTE();
-/* Local Variables interpret-get-local < Calls and Functions push-local
-        push(vm.stack[slot]); // [slot]
-*/
+        /* push(vm.stack[slot]); // [slot] */
+        // 取得したidxから値をロードしてスタックの先頭にPUSHする.
         push(frame->slots[slot]);
         break;
       }
       case OP_SET_LOCAL: {
+        // ローカル変数への代入
         uint8_t slot = READ_BYTE();
-/* Local Variables interpret-set-local < Calls and Functions set-local
+/*
         vm.stack[slot] = peek(0);
 */
+        // スタックの先頭から代入される値を取り出し, ローカル変数に対応するスタック・スロットに保存する.
+        // スタックから値をポップしないことに注意.
+        // 代入は式であり, すべての式は値を返す. よって代入式は代入された値を返すので, VMはスタックに値を残す.
         frame->slots[slot] = peek(0);
         break;
       }
