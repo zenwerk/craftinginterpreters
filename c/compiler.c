@@ -61,9 +61,7 @@ typedef enum {
   TYPE_SCRIPT
 } FunctionType;
 
-/* Local Variables compiler-struct < Calls and Functions enclosing-field
-typedef struct {
-*/
+// コンパイラを表す構造体
 typedef struct Compiler {
   struct Compiler *enclosing;
   ObjFunction *function;
@@ -313,8 +311,7 @@ static ParseRule *getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
 static uint8_t identifierConstant(Token *name) {
-  return makeConstant(OBJ_VAL(copyString(name->start,
-                                         name->length)));
+  return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
 }
 
 static bool identifiersEqual(Token *a, Token *b) {
@@ -694,88 +691,58 @@ static void unary(bool canAssign) {
   }
 }
 
+// あるトークンが与えられらたときに, どのように解析するかを示すテーブル.
+// {NULL, NULL, PREC_NONE} なエントリは, そのトークンは式では使用されない字句であることを示している.
 ParseRule rules[] = {
-/* Compiling Expressions rules < Calls and Functions infix-left-paren
-  [TOKEN_LEFT_PAREN]    = {grouping, NULL,   PREC_NONE},
-*/
+/* Compiling Expressions rules < Calls and Functions infix-left-paren */
     [TOKEN_LEFT_PAREN]    = {grouping, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN]   = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACE]    = {NULL, NULL, PREC_NONE}, // [big]
     [TOKEN_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
     [TOKEN_COMMA]         = {NULL, NULL, PREC_NONE},
-/* Compiling Expressions rules < Classes and Instances table-dot
-  [TOKEN_DOT]           = {NULL,     NULL,   PREC_NONE},
-*/
+/* Compiling Expressions rules < Classes and Instances table-dot */
     [TOKEN_DOT]           = {NULL, dot, PREC_CALL},
-    [TOKEN_MINUS]         = {unary, binary, PREC_TERM},
+    [TOKEN_MINUS]         = {unary, binary, PREC_TERM}, // `-`
     [TOKEN_PLUS]          = {NULL, binary, PREC_TERM},
     [TOKEN_SEMICOLON]     = {NULL, NULL, PREC_NONE},
     [TOKEN_SLASH]         = {NULL, binary, PREC_FACTOR},
     [TOKEN_STAR]          = {NULL, binary, PREC_FACTOR},
-/* Compiling Expressions rules < Types of Values table-not
-  [TOKEN_BANG]          = {NULL,     NULL,   PREC_NONE},
-*/
+/* Compiling Expressions rules < Types of Values table-not */
     [TOKEN_BANG]          = {unary, NULL, PREC_NONE},
-/* Compiling Expressions rules < Types of Values table-equal
-  [TOKEN_BANG_EQUAL]    = {NULL,     NULL,   PREC_NONE},
-*/
+/* Compiling Expressions rules < Types of Values table-equal */
     [TOKEN_BANG_EQUAL]    = {NULL, binary, PREC_EQUALITY},
     [TOKEN_EQUAL]         = {NULL, NULL, PREC_NONE},
-/* Compiling Expressions rules < Types of Values table-comparisons
-  [TOKEN_EQUAL_EQUAL]   = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_GREATER]       = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_GREATER_EQUAL] = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_LESS]          = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_LESS_EQUAL]    = {NULL,     NULL,   PREC_NONE},
-*/
+/* Compiling Expressions rules < Types of Values table-comparisons */
     [TOKEN_EQUAL_EQUAL]   = {NULL, binary, PREC_EQUALITY},
     [TOKEN_GREATER]       = {NULL, binary, PREC_COMPARISON},
     [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_LESS]          = {NULL, binary, PREC_COMPARISON},
     [TOKEN_LESS_EQUAL]    = {NULL, binary, PREC_COMPARISON},
-/* Compiling Expressions rules < Global Variables table-identifier
-  [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE},
-*/
+/* Compiling Expressions rules < Global Variables table-identifier */
     [TOKEN_IDENTIFIER]    = {variable, NULL, PREC_NONE},
-/* Compiling Expressions rules < Strings table-string
-  [TOKEN_STRING]        = {NULL,     NULL,   PREC_NONE},
-*/
+/* Compiling Expressions rules < Strings table-string */
     [TOKEN_STRING]        = {string, NULL, PREC_NONE},
-    [TOKEN_NUMBER]        = {number, NULL, PREC_NONE},
-/* Compiling Expressions rules < Jumping Back and Forth table-and
-  [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
-*/
+    [TOKEN_NUMBER]        = {number, NULL, PREC_NONE}, // 数値リテラル
+/* Compiling Expressions rules < Jumping Back and Forth table-and */
     [TOKEN_AND]           = {NULL, and_, PREC_AND},
     [TOKEN_CLASS]         = {NULL, NULL, PREC_NONE},
     [TOKEN_ELSE]          = {NULL, NULL, PREC_NONE},
-/* Compiling Expressions rules < Types of Values table-false
-  [TOKEN_FALSE]         = {NULL,     NULL,   PREC_NONE},
-*/
+/* Compiling Expressions rules < Types of Values table-false */
     [TOKEN_FALSE]         = {literal, NULL, PREC_NONE},
     [TOKEN_FOR]           = {NULL, NULL, PREC_NONE},
     [TOKEN_FUN]           = {NULL, NULL, PREC_NONE},
     [TOKEN_IF]            = {NULL, NULL, PREC_NONE},
-/* Compiling Expressions rules < Types of Values table-nil
-  [TOKEN_NIL]           = {NULL,     NULL,   PREC_NONE},
-*/
+/* Compiling Expressions rules < Types of Values table-nil */
     [TOKEN_NIL]           = {literal, NULL, PREC_NONE},
-/* Compiling Expressions rules < Jumping Back and Forth table-or
-  [TOKEN_OR]            = {NULL,     NULL,   PREC_NONE},
-*/
+/* Compiling Expressions rules < Jumping Back and Forth table-or */
     [TOKEN_OR]            = {NULL, or_, PREC_OR},
     [TOKEN_PRINT]         = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN]        = {NULL, NULL, PREC_NONE},
-/* Compiling Expressions rules < Superclasses table-super
-  [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
-*/
+/* Compiling Expressions rules < Superclasses table-super */
     [TOKEN_SUPER]         = {super_, NULL, PREC_NONE},
-/* Compiling Expressions rules < Methods and Initializers table-this
-  [TOKEN_THIS]          = {NULL,     NULL,   PREC_NONE},
-*/
+/* Compiling Expressions rules < Methods and Initializers table-this */
     [TOKEN_THIS]          = {this_, NULL, PREC_NONE},
-/* Compiling Expressions rules < Types of Values table-true
-  [TOKEN_TRUE]          = {NULL,     NULL,   PREC_NONE},
-*/
+/* Compiling Expressions rules < Types of Values table-true */
     [TOKEN_TRUE]          = {literal, NULL, PREC_NONE},
     [TOKEN_VAR]           = {NULL, NULL, PREC_NONE},
     [TOKEN_WHILE]         = {NULL, NULL, PREC_NONE},
@@ -783,32 +750,35 @@ ParseRule rules[] = {
     [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},
 };
 
+// parsePrecedence は指定された優先順位レベル以上の「式」(文じゃないよ)を解析する.
+// 優先順位を明示することで `-a.b + c` を -(a.b + c) のように解釈してしまうことを防ぐ.
+// NOTE: この関数は各パースルールの関数から再帰的に呼び出されるものだということを意識してコードを読もう.
 static void parsePrecedence(Precedence precedence) {
-/* Compiling Expressions parse-precedence < Compiling Expressions precedence-body
-  // What goes here?
-*/
-  advance();
+  advance(); // 字句を一つ読み込み先に進める.
   ParseFn prefixRule = getRule(parser.previous.type)->prefix;
+  // 最初のトークンは定義上、常に何らかの接頭辞表現に属することになる. コードを左から右に読んでいくと, 最初にヒットするトークンは常にプレフィックス式に属している.
   if (prefixRule == NULL) {
+    // 接頭辞ルールが存在しない字句から始まっているのは文法エラーな「式」が与えられたパターン.
+    // 例えば `else` から始まる式など.
     error("Expect expression.");
     return;
   }
 
-/* Compiling Expressions precedence-body < Global Variables prefix-rule
-  prefixRule();
-*/
+  // 演算子の優先順位が代入式より低い場合のみ,
+  // `=`トークンを探して消費できることを示すフラグ.
+  // 本文の `a * b = c + d` のパース例を読むこと.
   bool canAssign = precedence <= PREC_ASSIGNMENT;
-  prefixRule(canAssign);
+  prefixRule(canAssign); // 接頭辞式の解析を行う
 
-  while (precedence <= getRule(parser.current.type)->precedence) {
-    advance();
-    ParseFn infixRule = getRule(parser.previous.type)->infix;
-/* Compiling Expressions infix < Global Variables infix-rule
-    infixRule();
-*/
-    infixRule(canAssign);
+  // 後続のトークンに対応するinfixパースルールを探す.
+  // もしあるなら, すでにコンパイルしたprefixルールはオペランドなのかもしれない.
+  while (precedence <= getRule(parser.current.type)->precedence) { // 指定された優先順位以上のパースルールの間だけパースを続ける.
+    advance(); // 字句を取得し
+    ParseFn infixRule = getRule(parser.previous.type)->infix; // パース関数を取得し
+    infixRule(canAssign); // パースを実行し, 次のループへ進み, さらにパースを進めるか判断する.
   }
 
+  // 代入式が許可されたコンテキストにいながら `=` が消費されず残っているなら構文エラー.
   if (canAssign && match(TOKEN_EQUAL)) {
     error("Invalid assignment target.");
   }

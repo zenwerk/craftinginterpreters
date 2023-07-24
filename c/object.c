@@ -10,11 +10,14 @@
 #define ALLOCATE_OBJ(type, objectType) \
     (type*)allocateObject(sizeof(type), objectType)
 
+// allocateObject は size 分のメモリを確保し, その Obj ポインタを返す
 static Obj *allocateObject(size_t size, ObjType type) {
+  // Objectの初期化
   Obj *object = (Obj *) reallocate(NULL, 0, size);
   object->type = type;
   object->isMarked = false;
 
+  // 新規オブジェクトをVM管理のアドレスの先頭に挿入する
   object->next = vm.objects;
   vm.objects = object;
 
