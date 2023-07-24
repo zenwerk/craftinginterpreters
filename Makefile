@@ -66,6 +66,9 @@ clox:
 	@ $(MAKE) -f util/c.make NAME=clox MODE=release SOURCE_DIR=c
 	@ cp build/clox clox # For convenience, copy the interpreter to the top level.
 
+# for CLion
+all: clox
+
 # Compile the C interpreter as ANSI standard C++.
 cpplox:
 	@ $(MAKE) -f util/c.make NAME=cpplox MODE=debug CPP=true SOURCE_DIR=c
@@ -203,4 +206,5 @@ xml: $(TOOL_SOURCES)
 	@ dart --enable-asserts tool/bin/build_xml.dart
 
 .PHONY: book c_chapters clean clox compile_snippets debug default diffs \
-	get java_chapters jlox serve split_chapters test test_all test_c test_java
+	get java_chapters jlox serve split_chapters test test_all test_c test_java \
+	all
