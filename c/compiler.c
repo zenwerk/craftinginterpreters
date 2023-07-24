@@ -1060,6 +1060,7 @@ static void whileStatement() {
 }
 
 static void synchronize() {
+  // 文の解析終わりにエラー抑制フラグをOFFにする
   parser.panicMode = false;
 
   while (parser.current.type != TOKEN_EOF) {
