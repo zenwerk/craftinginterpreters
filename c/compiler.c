@@ -45,9 +45,10 @@ typedef struct {
   Precedence precedence; // そのトークンを演算子として使用するinfix式の優先順位
 } ParseRule;
 
+// ローカル変数を表す構造体
 typedef struct {
-  Token name;
-  int depth;
+  Token name; // ローカル変数名
+  int depth;  // ローカル変数が宣言されたブロックのスコープ深度
   bool isCaptured;
 } Local;
 
@@ -69,10 +70,12 @@ typedef struct Compiler {
   ObjFunction *function;
   FunctionType type;
 
-  Local locals[UINT8_COUNT];
-  int localCount;
+  // ローカル変数の指定に使えるオペランドが1byteであるため,
+  // 一つのブロックに登録できるローカル変数は UINT8_COUNT 個まで, という制限が生まれる.
+  Local locals[UINT8_COUNT]; // どのスタックスロットがどのローカル変数やテンポラリに関連付けられているかを追跡する
+  int localCount; // スコープ内にローカル変数が何個があるか, つまりlocals配列がいくつ使用中であるかを示す変数.
   Upvalue upvalues[UINT8_COUNT];
-  int scopeDepth;
+  int scopeDepth; // スコープの深さ, つまり現在コンパイル中のコードがいくつ {} で囲まれているかを示す.
 } Compiler;
 
 typedef struct ClassCompiler {
@@ -277,20 +280,25 @@ static ObjFunction *endCompiler() {
   return function;
 }
 
+// beginScope は現在のコンパイラ構造体のスコープ深度をインクリメントする
 static void beginScope() {
   current->scopeDepth++;
 }
 
+// endScope はスコープを抜けるときの処理を行う.
 static void endScope() {
-  current->scopeDepth--;
+  current->scopeDepth--; // 現在のスコープ深度をデクリメントする
 
+  // ローカル変数が存在する && 現在のスコープ深度よりローカル変数の深度が大きい場合(抜けたブロック内で定義されたローカル変数か？)
   while (current->localCount > 0 &&
          current->locals[current->localCount - 1].depth > current->scopeDepth) {
     if (current->locals[current->localCount - 1].isCaptured) {
       emitByte(OP_CLOSE_UPVALUE);
     } else {
+      // ローカル変数をスタックからPOPして破棄する.
       emitByte(OP_POP);
     }
+    // 変数を破棄したのでカウント数をデクリメントする.
     current->localCount--;
   }
 }
@@ -315,16 +323,22 @@ static bool identifiersEqual(Token *a, Token *b) {
 }
 
 static int resolveLocal(Compiler *compiler, Token *name) {
+  // コンパイラ構造体に登録されているローカル変数をなめる.
+  // 末尾からループすることでスコープ外の同名の変数をシャドーイングできる.
   for (int i = compiler->localCount - 1; i >= 0; i--) {
     Local *local = &compiler->locals[i];
+    // 指定された名前の変数か？
     if (identifiersEqual(name, &local->name)) {
       if (local->depth == -1) {
-        error("Can't read local variable in its own initializer.");
+        // 初期化中に自分自身を自己参照することはできないというエラー
+        // `{ var a = 1; { var a = a * 3;} }` みたいな代入式.
+        error("can't read local variable in its own initializer.");
       }
       return i;
     }
   }
 
+  // 見つからなかった
   return -1;
 }
 
@@ -366,31 +380,39 @@ static int resolveUpvalue(Compiler *compiler, Token *name) {
   return -1;
 }
 
+// addLocal は現在のコンパイラ構造体にローカル変数`name`を追加する
 static void addLocal(Token name) {
   if (current->localCount == UINT8_COUNT) {
     error("Too many local variables in function.");
     return;
   }
 
-  Local *local = &current->locals[current->localCount++];
+  Local *local = &current->locals[current->localCount++]; // ローカル変数の保存アドレスを取得する
+  // 取得したアドレスにローカル変数を保存する
   local->name = name;
-/* Local Variables add-local < Local Variables declare-undefined
-  local->depth = current->scopeDepth;
-*/
-  local->depth = -1;
+  local->depth = -1; // depth = -1 は変数が未初期化の状態であることを示す.
   local->isCaptured = false;
 }
 
+// declareVariable は変数を宣言する.
+// 宣言とは, コンパイラが変数の存在を記録することである.
 static void declareVariable() {
-  if (current->scopeDepth == 0) return;
+  // グローバル変数の宣言なら何もしない
+  if (current->scopeDepth == 0)
+    return;
 
+  // 変数名を取得する
   Token *name = &parser.previous;
+  // 現在のローカル変数をすべてなめる
   for (int i = current->localCount - 1; i >= 0; i--) {
     Local *local = &current->locals[i];
+    // ローカル変数のスコープ深度 != -1 かつ ローカル変数のスコープはコンパイラの現在のスコープの外側なら,
+    // ループを抜ける. (無駄なローカル変数の重複確認を行わないということ)
     if (local->depth != -1 && local->depth < current->scopeDepth) {
       break; // [negative]
     }
 
+    // 同じ変数名が宣言されていないか確認する
     if (identifiersEqual(name, &local->name)) {
       error("Already a variable with this name in this scope.");
     }
@@ -399,27 +421,41 @@ static void declareVariable() {
   addLocal(*name);
 }
 
+// parseVariable は変数名を解析する
 static uint8_t parseVariable(const char *errorMessage) {
   consume(TOKEN_IDENTIFIER, errorMessage);
 
+  // 変数の宣言 -> コンパイラ構造体に変数を記録.
   declareVariable();
-  if (current->scopeDepth > 0) return 0;
+  // ブロックスコープ内の変数宣言ならここで return
+  if (current->scopeDepth > 0)
+    return 0;
 
   return identifierConstant(&parser.previous);
 }
 
 static void markInitialized() {
-  if (current->scopeDepth == 0) return;
-  current->locals[current->localCount - 1].depth =
-      current->scopeDepth;
+  // コンパイラがトップレベルを解析中なら, それはグローバル変数なので何もしない
+  // lox ではグローバル変数はlate binding なので実行時に初期化済みであれば問題ない仕様のため.
+  if (current->scopeDepth == 0)
+    return;
+
+  // 変数が定義されたスコープ(その変数を所有するスコープ)の深度を記録する
+  current->locals[current->localCount - 1].depth = current->scopeDepth;
 }
 
+// defineVariable は変数を定義する.
+// 変数定義のための特別なバイトコードはemitしない.
+// なぜならスタックの先頭にすでにローカル変数となる値がPUSHされているからである.
+// 引数globalはグローバル変数のときだけ使用される.
 static void defineVariable(uint8_t global) {
+  // 非トップレベルの変数(ローカル変数)の場合
   if (current->scopeDepth > 0) {
     markInitialized();
     return;
   }
 
+  // グローバル変数の場合
   emitBytes(OP_DEFINE_GLOBAL, global);
 }
 
@@ -560,15 +596,13 @@ static void string(bool canAssign) {
                                   parser.previous.length - 2)));
 }
 
-/* Global Variables read-named-variable < Global Variables named-variable-signature
-static void namedVariable(Token name) {
-*/
+// namedVariable は変数の値の設定・取得を行う
 static void namedVariable(Token name, bool canAssign) {
-/* Global Variables read-named-variable < Local Variables named-local
-  uint8_t arg = identifierConstant(&name);
-*/
   uint8_t getOp, setOp;
+  // arg はバイトコードにemitされるオペランド.
+  // 値は指定されたコンパイラ構造体の locals配列のインデックス.
   int arg = resolveLocal(current, &name);
+  // -1 はローカル変数には登録されていない名前である = グローバル変数である
   if (arg != -1) {
     getOp = OP_GET_LOCAL;
     setOp = OP_SET_LOCAL;
@@ -581,9 +615,8 @@ static void namedVariable(Token name, bool canAssign) {
     setOp = OP_SET_GLOBAL;
   }
 
-/* Global Variables named-variable < Global Variables named-variable-can-assign
-  if (match(TOKEN_EQUAL)) {
-*/
+  // 代入式が許可されているコンテキストがあり, IDトークンの後に `=` が続くなら代入処理(setter).
+  // なければ値参照(getter).
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
     emitBytes(setOp, (uint8_t) arg);
@@ -592,11 +625,7 @@ static void namedVariable(Token name, bool canAssign) {
   }
 }
 
-/* Global Variables variable-without-assign < Global Variables variable
-static void variable() {
-  namedVariable(parser.previous);
-}
-*/
+// 変数名を解析する接頭辞パーサー.
 static void variable(bool canAssign) {
   namedVariable(parser.previous, canAssign);
 }
@@ -878,17 +907,21 @@ static void funDeclaration() {
   defineVariable(global);
 }
 
+// varDeclaration は変数宣言文を解析する
 static void varDeclaration() {
   uint8_t global = parseVariable("Expect variable name.");
 
+  // ここで emit されるバイトコード(の演算結果の値)がローカル変数を表すことになる
   if (match(TOKEN_EQUAL)) {
+    // 初期化式のパース
     expression();
   } else {
+    // 未初期化変数はすべて nil で初期化する
     emitByte(OP_NIL);
   }
-  consume(TOKEN_SEMICOLON,
-          "Expect ';' after variable declaration.");
+  consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 
+  // 変数の初期化を行う
   defineVariable(global);
 }
 
@@ -1040,6 +1073,7 @@ static void declaration() {
   } else if (match(TOKEN_FUN)) {
     funDeclaration();
   } else if (match(TOKEN_VAR)) {
+    // 変数制限の解析
     varDeclaration();
   } else {
     // 宣言と文は明確に分ける
