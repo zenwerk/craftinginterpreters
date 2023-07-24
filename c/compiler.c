@@ -50,10 +50,12 @@ typedef struct {
   int depth;
   bool isCaptured;
 } Local;
+
 typedef struct {
   uint8_t index;
   bool isLocal;
 } Upvalue;
+
 typedef enum {
   TYPE_FUNCTION,
   TYPE_INITIALIZER,
@@ -257,9 +259,6 @@ static void initCompiler(Compiler *compiler, FunctionType type) {
   }
 }
 
-/* Compiling Expressions end-compiler < Calls and Functions end-compiler
-static void endCompiler() {
-*/
 static ObjFunction *endCompiler() {
   emitReturn();
   ObjFunction *function = current->function;
@@ -286,11 +285,7 @@ static void endScope() {
   current->scopeDepth--;
 
   while (current->localCount > 0 &&
-         current->locals[current->localCount - 1].depth >
-         current->scopeDepth) {
-/* Local Variables pop-locals < Closures end-scope
-    emitByte(OP_POP);
-*/
+         current->locals[current->localCount - 1].depth > current->scopeDepth) {
     if (current->locals[current->localCount - 1].isCaptured) {
       emitByte(OP_CLOSE_UPVALUE);
     } else {
@@ -517,9 +512,6 @@ static void dot(bool canAssign) {
   }
 }
 
-/* Types of Values parse-literal < Global Variables parse-literal
-static void literal() {
-*/
 static void literal(bool canAssign) {
   switch (parser.previous.type) {
     case TOKEN_FALSE:
@@ -536,22 +528,13 @@ static void literal(bool canAssign) {
   }
 }
 
-/* Compiling Expressions grouping < Global Variables grouping
-static void grouping() {
-*/
 static void grouping(bool canAssign) {
   expression();
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
 }
 
-/* Compiling Expressions number < Global Variables number
-static void number() {
-*/
 static void number(bool canAssign) {
   double value = strtod(parser.previous.start, NULL);
-/* Compiling Expressions number < Types of Values const-number-val
-  emitConstant(value);
-*/
   emitConstant(NUMBER_VAL(value));
 }
 
@@ -566,9 +549,6 @@ static void or_(bool canAssign) {
   patchJump(endJump);
 }
 
-/* Strings parse-string < Global Variables string
-static void string() {
-*/
 static void string(bool canAssign) {
   emitConstant(OBJ_VAL(copyString(parser.previous.start + 1,
                                   parser.previous.length - 2)));
@@ -594,23 +574,14 @@ static void namedVariable(Token name, bool canAssign) {
     getOp = OP_GET_GLOBAL;
     setOp = OP_SET_GLOBAL;
   }
-/* Global Variables read-named-variable < Global Variables named-variable
-  emitBytes(OP_GET_GLOBAL, arg);
-*/
 
 /* Global Variables named-variable < Global Variables named-variable-can-assign
   if (match(TOKEN_EQUAL)) {
 */
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
-/* Global Variables named-variable < Local Variables emit-set
-    emitBytes(OP_SET_GLOBAL, arg);
-*/
     emitBytes(setOp, (uint8_t) arg);
   } else {
-/* Global Variables named-variable < Local Variables emit-get
-    emitBytes(OP_GET_GLOBAL, arg);
-*/
     emitBytes(getOp, (uint8_t) arg);
   }
 }
@@ -666,9 +637,7 @@ static void this_(bool canAssign) {
 
   variable(false);
 } // [this]
-/* Compiling Expressions unary < Global Variables unary
-static void unary() {
-*/
+
 static void unary(bool canAssign) {
   TokenType operatorType = parser.previous.type;
 
@@ -789,9 +758,6 @@ static ParseRule *getRule(TokenType type) {
 }
 
 static void expression() {
-/* Compiling Expressions expression < Compiling Expressions expression-body
-  // What goes here?
-*/
   parsePrecedence(PREC_ASSIGNMENT);
 }
 
@@ -1062,22 +1028,13 @@ static void synchronize() {
 static void declaration() {
   if (match(TOKEN_CLASS)) {
     classDeclaration();
-/* Calls and Functions match-fun < Classes and Instances match-class
-  if (match(TOKEN_FUN)) {
-*/
   } else if (match(TOKEN_FUN)) {
     funDeclaration();
-/* Global Variables match-var < Calls and Functions match-fun
-  if (match(TOKEN_VAR)) {
-*/
   } else if (match(TOKEN_VAR)) {
     varDeclaration();
   } else {
     statement();
   }
-/* Global Variables declaration < Global Variables match-var
-  statement();
-*/
 
   if (parser.panicMode) synchronize();
 }
