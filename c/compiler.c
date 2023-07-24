@@ -208,7 +208,7 @@ static uint8_t makeConstant(Value value) {
     return 0;
   }
 
-  return (uint8_t) constant;
+  return (uint8_t)constant;
 }
 
 static void emitConstant(Value value) {
@@ -447,14 +447,20 @@ static void and_(bool canAssign) {
   patchJump(endJump);
 }
 
-/* Compiling Expressions binary < Global Variables binary
-static void binary() {
-*/
+// 二項演算子を解析する関数.
+// この関数が呼ばれるとき, 例えば `1+2` のとき, `1+` までパーサーは字句を読み込んでいる状態.
+// つまり,左オペランドはすでに解析済み, 次に `+` を読み込んで現在解析しているものが二項演算子であるとわかったタイミングである.
+// よって残る処理は右オペランドを解析し最後に演算子に基づくバイトコードをPUSHすることである.
 static void binary(bool canAssign) {
   TokenType operatorType = parser.previous.type;
   ParseRule *rule = getRule(operatorType);
+  // 例えば `2*3+4` が与えられたとき `(2*3)+4` と解析されるべきなので
+  // 現在の演算子より一つ高い優先順位で解析を行わないといけない => `rule->precedence + 1` が必要
+  // 同じ優先順位でもよいのでは? となるが`1*2*3*4`なら`((1*2)*3)*4`というふうに解析したいのである(ただし左結合の場合).
+  // NOTE: 右結合(例えば代入式`a = (b = (c = d))`)の場合は「同じ優先順位」でparsePrecedenceを呼ぶ.
   parsePrecedence((Precedence) (rule->precedence + 1));
 
+  // 最後に二項演算子に基づくバイトコードをPUSHする.
   switch (operatorType) {
     case TOKEN_BANG_EQUAL:
       emitBytes(OP_EQUAL, OP_NOT);
@@ -639,15 +645,15 @@ static void this_(bool canAssign) {
 } // [this]
 
 static void unary(bool canAssign) {
+  // 単項演算子を取得する
   TokenType operatorType = parser.previous.type;
 
-  // Compile the operand.
-/* Compiling Expressions unary < Compiling Expressions unary-operand
-  expression();
-*/
+  // 単項演算子に続く式(ただし単項演算子より優先順位が高いもの)を先にパースする.
+  // `-a.b+c` という式があるとき, 優先順位が未指定だと`-(a.b+c)`と解釈されてしまう. 正しくは`-(a.b)+c`
   parsePrecedence(PREC_UNARY);
 
   // Emit the operator instruction.
+  // 最後に単項演算子のバイトコードをPUSH
   switch (operatorType) {
     case TOKEN_BANG:
       emitByte(OP_NOT);
@@ -757,6 +763,7 @@ static ParseRule *getRule(TokenType type) {
   return &rules[type];
 }
 
+// expression は式を解析する.
 static void expression() {
   parsePrecedence(PREC_ASSIGNMENT);
 }
@@ -1025,6 +1032,8 @@ static void synchronize() {
   }
 }
 
+// declaration は宣言をパースする.
+// 宣言はソースコードのトップレベルやブロック内で許可された文法を処理する.
 static void declaration() {
   if (match(TOKEN_CLASS)) {
     classDeclaration();
@@ -1033,12 +1042,15 @@ static void declaration() {
   } else if (match(TOKEN_VAR)) {
     varDeclaration();
   } else {
+    // 宣言と文は明確に分ける
     statement();
   }
 
   if (parser.panicMode) synchronize();
 }
 
+// statement は文を解析する.
+// 文はコントロールフロー内で許可された文法を処理する.
 static void statement() {
   if (match(TOKEN_PRINT)) {
     printStatement();
