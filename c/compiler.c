@@ -947,34 +947,30 @@ static void expressionStatement() {
 static void forStatement() {
   beginScope();
   consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
-/* Jumping Back and Forth for-statement < Jumping Back and Forth for-initializer
-  consume(TOKEN_SEMICOLON, "Expect ';'.");
-*/
+  // for(`初期値`; ...) の箇所のコンパイル
   if (match(TOKEN_SEMICOLON)) {
-    // No initializer.
+    // 初期化子なし
   } else if (match(TOKEN_VAR)) {
+    // var i = 0; とかする場合
     varDeclaration();
   } else {
+    // 既存変数を用いた式など
     expressionStatement();
   }
 
   int loopStart = currentChunk()->count;
-/* Jumping Back and Forth for-statement < Jumping Back and Forth for-exit
-  consume(TOKEN_SEMICOLON, "Expect ';'.");
-*/
   int exitJump = -1;
+  // for(; `条件式`; ...) のコンパイル
   if (!match(TOKEN_SEMICOLON)) {
     expression();
     consume(TOKEN_SEMICOLON, "Expect ';' after loop condition.");
 
     // Jump out of the loop if the condition is false.
     exitJump = emitJump(OP_JUMP_IF_FALSE);
-    emitByte(OP_POP); // Condition.
+    emitByte(OP_POP); // 条件式の結果は不要なのでPOPする
   }
 
-/* Jumping Back and Forth for-statement < Jumping Back and Forth for-increment
-  consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
-*/
+  // for(;;`更新式`) のコンパイル
   if (!match(TOKEN_RIGHT_PAREN)) {
     int bodyJump = emitJump(OP_JUMP);
     int incrementStart = currentChunk()->count;
@@ -987,7 +983,7 @@ static void forStatement() {
     patchJump(bodyJump);
   }
 
-  statement();
+  statement(); // for の中身のコンパイル
   emitLoop(loopStart);
 
   if (exitJump != -1) {
@@ -1047,18 +1043,20 @@ static void returnStatement() {
 }
 
 static void whileStatement() {
-  int loopStart = currentChunk()->count;
+  int loopStart = currentChunk()->count; // 開始アドレスを取得しておく
+  // while `(条件式)` のコンパイル
   consume(TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
   expression();
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
 
+  // 条件式が偽なら終わりまでJUMP
   int exitJump = emitJump(OP_JUMP_IF_FALSE);
-  emitByte(OP_POP);
+  emitByte(OP_POP); // 条件式の評価結果は不要なのでPOP(真の場合)
   statement();
-  emitLoop(loopStart);
+  emitLoop(loopStart); // 開始アドレスまで戻る
 
   patchJump(exitJump);
-  emitByte(OP_POP);
+  emitByte(OP_POP); // 条件式の評価結果は不要なのでPOP(偽の場合)
 }
 
 static void synchronize() {
