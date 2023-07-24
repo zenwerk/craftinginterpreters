@@ -11,6 +11,9 @@
 
 #define GC_HEAP_GROW_FACTOR 2
 
+// reallocate は clox 全体で使用されるメモリ確保ユーティリティ関数.
+// この関数を呼び出すときGCが起動することがある.
+// - newSize = 0 のメモリを解放する.
 void *reallocate(void *pointer, size_t oldSize, size_t newSize) {
   // GC updated-bytes-allocated
   vm.bytesAllocated += newSize - oldSize;
@@ -19,7 +22,7 @@ void *reallocate(void *pointer, size_t oldSize, size_t newSize) {
 #ifdef DEBUG_STRESS_GC
     collectGarbage();
 #endif
-
+    // しきい値を超えたらGCを起動する
     if (vm.bytesAllocated > vm.nextGC) {
       collectGarbage();
     }
@@ -38,6 +41,7 @@ void *reallocate(void *pointer, size_t oldSize, size_t newSize) {
 
 void markObject(Obj *object) {
   if (object == NULL) return;
+  // すでに追跡された痕跡がある(灰色 or 黒色)なら何もしない
   if (object->isMarked) return;
 
 #ifdef DEBUG_LOG_GC
@@ -46,16 +50,21 @@ void markObject(Obj *object) {
   printf("\n");
 #endif
 
+  // GCに追跡された痕跡をマークする
+  // このフラグは黒色に塗りつぶすことを意味しないので注意
   object->isMarked = true;
 
   if (vm.grayCapacity < vm.grayCount + 1) {
     vm.grayCapacity = GROW_CAPACITY(vm.grayCapacity);
-    vm.grayStack = (Obj **) realloc(vm.grayStack,
-                                    sizeof(Obj *) * vm.grayCapacity);
+    // 灰色オブジェクトを管理するStackの realloc はOS独自のものを使う.
+    // これはGCのためのスタック伸長時にGCが起動してしまうような状態を避けるため.
+    vm.grayStack = (Obj **) realloc(vm.grayStack, sizeof(Obj *) * vm.grayCapacity);
 
     if (vm.grayStack == NULL) exit(1);
   }
 
+  // このStackに追加されることが、灰色にマークされることである
+  // isGray のようなフラグはないことに注意
   vm.grayStack[vm.grayCount++] = object;
 }
 
@@ -69,6 +78,7 @@ static void markArray(ValueArray *array) {
   }
 }
 
+// grayStack から取り出された灰色オブジェクトを黒く塗っていく(GC処理)
 static void blackenObject(Obj *object) {
 #ifdef DEBUG_LOG_GC
   printf("%p blacken ", (void*)object);
@@ -187,6 +197,8 @@ static void markRoots() {
   markObject((Obj *) vm.initString);
 }
 
+// grayStack(灰色オブジェクトの集合)が空になるまでオブジェクトを取り出し, 参照を走査し黒く塗っていく.
+// 白色オブジェクトが発見されたら灰色に塗る.
 static void traceReferences() {
   while (vm.grayCount > 0) {
     Obj *object = vm.grayStack[--vm.grayCount];
@@ -194,15 +206,18 @@ static void traceReferences() {
   }
 }
 
+// リンクリストを走査していき `isMarked = false` なオブジェクトをリストから外して解放する
 static void sweep() {
   Obj *previous = NULL;
   Obj *object = vm.objects;
   while (object != NULL) {
     if (object->isMarked) {
-      object->isMarked = false;
+      // 黒色オブジェクトである
+      object->isMarked = false; // フラグをもとに戻す
       previous = object;
       object = object->next;
     } else {
+      // 白色オブジェクトである
       Obj *unreached = object;
       object = object->next;
       if (previous != NULL) {
@@ -211,6 +226,7 @@ static void sweep() {
         vm.objects = object;
       }
 
+      // 解放する
       freeObject(unreached);
     }
   }

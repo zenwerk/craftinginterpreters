@@ -41,9 +41,9 @@ typedef struct {
   ObjString *initString;
   ObjUpvalue *openUpvalues;
 
-  size_t bytesAllocated;
-  size_t nextGC;
-  Obj *objects;
+  size_t bytesAllocated; // 確保したメモリ領域
+  size_t nextGC; // 次GCを起動するときのサイズ
+  Obj *objects; // VMに確保されたオブジェクトの連結リストの先頭アドレス
   int grayCount;
   int grayCapacity;
   Obj **grayStack;
