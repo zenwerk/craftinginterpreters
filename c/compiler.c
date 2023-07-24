@@ -998,21 +998,27 @@ static void forStatement() {
   endScope();
 }
 
+// ifStatement は if文をコンパイルする
 static void ifStatement() {
+  // if `(条件式)` をコンパイルする
   consume(TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
   expression();
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition."); // [paren]
 
+  // 条件が偽の場合はif文の終了アドレスまでジャンプする
   int thenJump = emitJump(OP_JUMP_IF_FALSE);
-  emitByte(OP_POP);
-  statement();
+  emitByte(OP_POP); // 条件式の結果はもういらないのでPOPする(真のとき)
+  statement(); // then節
 
+  // else節を実行してはいけないので else の後にJUMPする
   int elseJump = emitJump(OP_JUMP);
 
-  patchJump(thenJump);
-  emitByte(OP_POP);
+  patchJump(thenJump); // 仮置きしたオペランドを更新する
+  emitByte(OP_POP); // 条件式の結果はもういらないのでPOPする(偽のとき)
 
+  // else節があるなら再び文の解析に入る -> else | if (...) という流れで else if が実現できる.
   if (match(TOKEN_ELSE)) statement();
+  // else を実行しなかった場合の飛び先はこちら
   patchJump(elseJump);
 }
 
