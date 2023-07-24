@@ -484,12 +484,15 @@ static uint8_t argumentList() {
 }
 
 static void and_(bool canAssign) {
+  // infixルールなので, この関数が呼ばれた時点で左辺値はすでにコンパイル済みの状態.
+  // 実行時にはその結果がすでにスタックの銭湯にあるので, 偽とき右辺値を評価する必要はない.
   int endJump = emitJump(OP_JUMP_IF_FALSE);
 
-  emitByte(OP_POP);
+  emitByte(OP_POP); // 左辺値はもう不要なのでPOPする.
   parsePrecedence(PREC_AND);
 
-  patchJump(endJump);
+  patchJump(endJump); // jump先アドレスをpatchする
+  // 右辺値の値は and 式の結果となるので POP しないことに注意.
 }
 
 // 二項演算子を解析する関数.
@@ -590,14 +593,15 @@ static void number(bool canAssign) {
 }
 
 static void or_(bool canAssign) {
+  // 左辺値が真なら, 残りの評価は不要
   int elseJump = emitJump(OP_JUMP_IF_FALSE);
-  int endJump = emitJump(OP_JUMP);
+  int endJump = emitJump(OP_JUMP); // 真の場合は終わりまでJUMPする
 
   patchJump(elseJump);
-  emitByte(OP_POP);
+  emitByte(OP_POP); // 左辺値の値は不要なのでPOPする
 
-  parsePrecedence(PREC_OR);
-  patchJump(endJump);
+  parsePrecedence(PREC_OR); // 後続の右辺値を評価する
+  patchJump(endJump); // 終了JUMP先のアドレスをpatchする
 }
 
 static void string(bool canAssign) {
