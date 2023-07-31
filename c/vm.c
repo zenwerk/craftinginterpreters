@@ -18,7 +18,7 @@ static Value clockNative(int argCount, Value *args) {
 // resetStack はグローバル変数vmのスタックを初期化する
 static void resetStack() {
   vm.stackTop = vm.stack; // スタックポインタを先頭に.
-  vm.frameCount = 0;
+  vm.frameCount = 0;      // VM起動時は CallFrame は 0 である.
   vm.openUpvalues = NULL;
 }
 
