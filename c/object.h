@@ -45,12 +45,14 @@ struct Obj {
   struct Obj *next; // 連結リスト用
 };
 
+// ObjFunction はコンパイルされた関数のChunkを保存する構造体.
+// 関数の実行時表現.
 typedef struct {
-  Obj obj;
-  int arity;
+  Obj obj;           // 言語内でファーストクラスの扱うを受けるものは Obj を継承(?)しなければならない.
+  int arity;         // 関数が受け取る引数の数
   int upvalueCount;
-  Chunk chunk;
-  ObjString *name;
+  Chunk chunk;       // 関数本体のバイトコード
+  ObjString *name;   // 関数名
 } ObjFunction;
 
 typedef Value (*NativeFn)(int argCount, Value *args);

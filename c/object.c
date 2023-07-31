@@ -58,6 +58,7 @@ ObjClosure *newClosure(ObjFunction *function) {
   return closure;
 }
 
+// newFunction は新しい関数構造体を生成する
 ObjFunction *newFunction() {
   ObjFunction *function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
   function->arity = 0;

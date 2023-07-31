@@ -57,25 +57,26 @@ typedef struct {
   bool isLocal;
 } Upvalue;
 
+// コンパイルされる関数の種類を指定する
 typedef enum {
-  TYPE_FUNCTION,
+  TYPE_FUNCTION, // 通常定義関数
   TYPE_INITIALIZER,
   TYPE_METHOD,
-  TYPE_SCRIPT
+  TYPE_SCRIPT // トップレベルのコード
 } FunctionType;
 
 // コンパイラを表す構造体
 typedef struct Compiler {
   struct Compiler *enclosing;
-  ObjFunction *function;
+  ObjFunction *function; // コンパイルする関数オブジェクトへの参照
   FunctionType type;
 
   // ローカル変数の指定に使えるオペランドが1byteであるため,
   // 一つのブロックに登録できるローカル変数は UINT8_COUNT 個まで, という制限が生まれる.
-  Local locals[UINT8_COUNT]; // どのスタックスロットがどのローカル変数やテンポラリに関連付けられているかを追跡する
-  int localCount; // スコープ内にローカル変数が何個があるか, つまりlocals配列がいくつ使用中であるかを示す変数.
+  Local locals[UINT8_COUNT];     // どのスタックスロットがどのローカル変数やテンポラリに関連付けられているかを追跡する.
+  int localCount;                // スコープ内にローカル変数が何個があるか, つまりlocals配列がいくつ使用中であるかを示す変数.
   Upvalue upvalues[UINT8_COUNT];
-  int scopeDepth; // スコープの深さ, つまり現在コンパイル中のコードがいくつ {} で囲まれているかを示す.
+  int scopeDepth;                // スコープの深さ, つまり現在コンパイル中のコードがいくつ {} で囲まれているかを示す.
 } Compiler;
 
 typedef struct ClassCompiler {
@@ -95,6 +96,7 @@ static Chunk* currentChunk() {
 }
 */
 
+// currentChunk は __現在コンパイルしている__ 関数のChunkへの参照を返す
 static Chunk *currentChunk() {
   return &current->function->chunk;
 }
@@ -198,9 +200,6 @@ static int emitJump(uint8_t instruction) {
 }
 
 static void emitReturn() {
-/* Calls and Functions return-nil < Methods and Initializers return-this
-  emitByte(OP_NIL);
-*/
   if (current->type == TYPE_INITIALIZER) {
     emitBytes(OP_GET_LOCAL, 0);
   } else {
@@ -239,54 +238,47 @@ static void patchJump(int offset) {
   currentChunk()->code[offset + 1] = jump & 0xff;
 }
 
-/* Local Variables init-compiler < Calls and Functions init-compiler
-static void initCompiler(Compiler* compiler) {
-*/
+// initCompiler はコンパイラ構造体を初期化する.
 static void initCompiler(Compiler *compiler, FunctionType type) {
   compiler->enclosing = current;
-  compiler->function = NULL;
+  compiler->function = NULL; // ガベージコレクション回避のためのパラノイア的操作.
   compiler->type = type;
   compiler->localCount = 0;
   compiler->scopeDepth = 0;
-  compiler->function = newFunction();
+  compiler->function = newFunction(); // コンパイルするための新しい関数オブジェクトを確保.
   current = compiler;
   if (type != TYPE_SCRIPT) {
     current->function->name = copyString(parser.previous.start,
                                          parser.previous.length);
   }
 
+  // 以下の1行は locals[0] をVM内部で使用することを暗黙的に示している.
   Local *local = &current->locals[current->localCount++];
-  local->depth = 0;
+  local->depth = 0; // ネスト数 0 はトップレベルコードである.
   local->isCaptured = false;
-/* Calls and Functions init-function-slot < Methods and Initializers slot-zero
-  local->name.start = "";
-  local->name.length = 0;
-*/
   if (type != TYPE_FUNCTION) {
     local->name.start = "this";
     local->name.length = 4;
   } else {
-    local->name.start = "";
+    local->name.start = "";  // ユーザーはVMのスタックスペースを指定できないように空文字列を与える.
     local->name.length = 0;
   }
 }
 
 static ObjFunction *endCompiler() {
-  emitReturn();
-  ObjFunction *function = current->function;
+  emitReturn(); // RETURN命令を追加する
+  ObjFunction *function = current->function; // 現在コンパイル中の関数オブジェクト参照を取得.
 
 #ifdef DEBUG_PRINT_CODE
   if (!parser.hadError) {
-/* Compiling Expressions dump-chunk < Calls and Functions disassemble-end
-    disassembleChunk(currentChunk(), "code");
-*/
     disassembleChunk(currentChunk(), function->name != NULL
         ? function->name->chars : "<script>");
   }
 #endif
 
   current = current->enclosing;
-  return function;
+
+  return function; // 取得した関数を返す
 }
 
 // beginScope は現在のコンパイラ構造体のスコープ深度をインクリメントする
@@ -1123,12 +1115,6 @@ static void statement() {
   }
 }
 
-/* Scanning on Demand compiler-c < Compiling Expressions compile-signature
-void compile(const char* source) {
-*/
-/* Compiling Expressions compile-signature < Calls and Functions compile-signature
-bool compile(const char* source, Chunk* chunk) {
-*/
 ObjFunction *compile(const char *source) {
   initScanner(source);
 /* Scanning on Demand dump-tokens < Compiling Expressions compile-chunk
@@ -1168,12 +1154,7 @@ ObjFunction *compile(const char *source) {
     declaration();
   }
 
-/* Compiling Expressions finish-compile < Calls and Functions call-end-compiler
-  endCompiler();
-*/
-/* Compiling Expressions return-had-error < Calls and Functions call-end-compiler
-  return !parser.hadError;
-*/
+  // エラーがなければコンパイルした関数オブジェクトの参照を返す.
   ObjFunction *function = endCompiler();
   return parser.hadError ? NULL : function;
 }
