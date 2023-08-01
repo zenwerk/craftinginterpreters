@@ -29,17 +29,10 @@ static void runtimeError(const char *format, ...) {
   va_end(args);
   fputs("\n", stderr);
 
-/* Types of Values runtime-error < Calls and Functions runtime-error-temp
-  size_t instruction = vm.ip - vm.chunk->code - 1;
-  int line = vm.chunk->lines[instruction];
-*/
-/* Calls and Functions runtime-error-temp < Calls and Functions runtime-error-stack
-  CallFrame* frame = &vm.frames[vm.frameCount - 1];
+/*
+  CallFrame* frame = &vm.frames[vm.frameCount - 1]; // CallFrameスタックの先頭を取得
   size_t instruction = frame->ip - frame->function->chunk.code - 1;
   int line = frame->function->chunk.lines[instruction];
-*/
-/* Types of Values runtime-error < Calls and Functions runtime-error-stack
-  fprintf(stderr, "[line %d] in script\n", line);
 */
   for (int i = vm.frameCount - 1; i >= 0; i--) {
     CallFrame *frame = &vm.frames[i];
@@ -296,21 +289,15 @@ static void concatenate() {
   push(OBJ_VAL(result));
 }
 
+// run は生成した lox バイトコードを実行する.
 static InterpretResult run() {
   CallFrame *frame = &vm.frames[vm.frameCount - 1];
 
-/* A Virtual Machine run < Calls and Functions run
-#define READ_BYTE() (*vm.ip++)
-*/
 #define READ_BYTE() (*frame->ip++)
-/* A Virtual Machine read-constant < Calls and Functions run
+/*
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
 */
 
-/* Jumping Back and Forth read-short < Calls and Functions run
-#define READ_SHORT() \
-    (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
-*/
 #define READ_SHORT() \
     (frame->ip += 2, \
     (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
@@ -351,14 +338,6 @@ static InterpretResult run() {
       printf(" ]");
     }
     printf("\n");
-/* A Virtual Machine trace-execution < Calls and Functions trace-execution
-    disassembleInstruction(vm.chunk,
-                           (int)(vm.ip - vm.chunk->code));
-*/
-/* Calls and Functions trace-execution < Closures disassemble-instruction
-    disassembleInstruction(&frame->function->chunk,
-        (int)(frame->ip - frame->function->chunk.code));
-*/
     disassembleInstruction(&frame->closure->function->chunk,
         (int)(frame->ip - frame->closure->function->chunk.code));
 #endif
@@ -391,21 +370,17 @@ static InterpretResult run() {
 
         // ローカル変数が存在するスタックidxを1byteオペランドで取る
         uint8_t slot = READ_BYTE();
-        /* push(vm.stack[slot]); // [slot] */
-        // 取得したidxから値をロードしてスタックの先頭にPUSHする.
+        // 現在CallFrameのslots先頭を経由して相対的にアクセスしてPUSHする.
         push(frame->slots[slot]);
         break;
       }
       case OP_SET_LOCAL: {
         // ローカル変数への代入
         uint8_t slot = READ_BYTE();
-/*
-        vm.stack[slot] = peek(0);
-*/
         // スタックの先頭から代入される値を取り出し, ローカル変数に対応するスタック・スロットに保存する.
         // スタックから値をポップしないことに注意.
         // 代入は式であり, すべての式は値を返す. よって代入式は代入された値を返すので, VMはスタックに値を残す.
-        frame->slots[slot] = peek(0);
+        frame->slots[slot] = peek(0); // GET_OP_LOCAL 同様 CallFrame の slots 経由でセットする.
         break;
       }
       case OP_GET_GLOBAL: {
@@ -562,17 +537,11 @@ static InterpretResult run() {
       }
       case OP_JUMP_IF_FALSE: {
         uint16_t offset = READ_SHORT();
-/* Jumping Back and Forth op-jump-if-false < Calls and Functions jump-if-false
-        if (isFalsey(peek(0))) vm.ip += offset;
-*/
         if (isFalsey(peek(0))) frame->ip += offset;
         break;
       }
       case OP_LOOP: {
         uint16_t offset = READ_SHORT();
-/* Jumping Back and Forth op-loop < Calls and Functions loop
-        vm.ip -= offset;
-*/
         frame->ip -= offset;
         break;
       }
@@ -683,39 +652,17 @@ void hack(bool b) {
   if (b) hack(false);
 }
 
-/* A Virtual Machine interpret < Scanning on Demand vm-interpret-c
-InterpretResult interpret(Chunk* chunk) {
-  vm.chunk = chunk;
-  vm.ip = vm.chunk->code;
-  return run();
-*/
 // interpret は入力された lox 言語を実行する入り口.
 InterpretResult interpret(const char *source) {
-/* Scanning on Demand vm-interpret-c < Compiling Expressions interpret-chunk
-  compile(source);
-  return INTERPRET_OK;
-*/
-/* Compiling Expressions interpret-chunk < Calls and Functions interpret-stub
-  Chunk chunk;
-  initChunk(&chunk);
-
-  if (!compile(source, &chunk)) {
-    freeChunk(&chunk);
-    return INTERPRET_COMPILE_ERROR;
-  }
-
-  vm.chunk = &chunk;
-  vm.ip = vm.chunk->code;
-*/
   ObjFunction *function = compile(source);
   if (function == NULL) return INTERPRET_COMPILE_ERROR;
 
   push(OBJ_VAL(function));
-/* Calls and Functions interpret-stub < Calls and Functions interpret
-  CallFrame* frame = &vm.frames[vm.frameCount++];
-  frame->function = function;
-  frame->ip = function->chunk.code;
-  frame->slots = vm.stack;
+/*
+  CallFrame* frame = &vm.frames[vm.frameCount++]; // 先頭の CallFrame[0] を最初の関数に設定.
+  frame->function = function;                     // トップレベル関数(暗黙的main)を参照させる.
+  frame->ip = function->chunk.code;               // 命令ポインタを関数チャンクの先頭に設定.
+  frame->slots = vm.stack;                        // Stackの先頭アドレスを関数のslotsに設定.
 */
 /* Calls and Functions interpret < Closures interpret
   call(function, 0);
