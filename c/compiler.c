@@ -65,9 +65,13 @@ typedef enum {
   TYPE_SCRIPT // トップレベルのコード
 } FunctionType;
 
-// コンパイラを表す構造体
+// コンパイラを表す構造体.
+// この構造体が管理するものは
+// - コンパイルしている関数
+// - ローカル変数
+// - スコープの深さ
 typedef struct Compiler {
-  struct Compiler *enclosing;
+  struct Compiler *enclosing; // 連結リスト用 (Compiler構造体はコンパイルする関数毎に生成される)
   ObjFunction *function; // コンパイルする関数オブジェクトへの参照
   FunctionType type;
 
@@ -203,6 +207,7 @@ static void emitReturn() {
   if (current->type == TYPE_INITIALIZER) {
     emitBytes(OP_GET_LOCAL, 0);
   } else {
+    // 明示的 return がない void な関数には NIL をPUSHする命令を仕込む.
     emitByte(OP_NIL);
   }
 
@@ -240,13 +245,14 @@ static void patchJump(int offset) {
 
 // initCompiler はコンパイラ構造体を初期化する.
 static void initCompiler(Compiler *compiler, FunctionType type) {
-  compiler->enclosing = current;
+  compiler->enclosing = current; // 現在使用されているCompiler構造体を退避
   compiler->function = NULL; // ガベージコレクション回避のためのパラノイア的操作.
   compiler->type = type;
   compiler->localCount = 0;
   compiler->scopeDepth = 0;
   compiler->function = newFunction(); // コンパイルするための新しい関数オブジェクトを確保.
-  current = compiler;
+  current = compiler; // 現在コンパイルしている関数(Compiler)を更新する
+  // 通常の関数定義の場合はここでコンパイルする関数名を取得する
   if (type != TYPE_SCRIPT) {
     current->function->name = copyString(parser.previous.start,
                                          parser.previous.length);
@@ -276,7 +282,7 @@ static ObjFunction *endCompiler() {
   }
 #endif
 
-  current = current->enclosing;
+  current = current->enclosing; // 退避していたCompiler構造体を戻す
 
   return function; // 取得した関数を返す
 }
@@ -460,6 +466,7 @@ static void defineVariable(uint8_t global) {
   emitBytes(OP_DEFINE_GLOBAL, global);
 }
 
+// 関数の引数リストを解析する.
 static uint8_t argumentList() {
   uint8_t argCount = 0;
   if (!check(TOKEN_RIGHT_PAREN)) {
@@ -537,9 +544,10 @@ static void binary(bool canAssign) {
   }
 }
 
+// 関数呼び出し`()`はinfix演算子.
 static void call(bool canAssign) {
-  uint8_t argCount = argumentList();
-  emitBytes(OP_CALL, argCount);
+  uint8_t argCount = argumentList(); // 引数を解析
+  emitBytes(OP_CALL, argCount); // 関数呼び出し命令をemit
 }
 
 static void dot(bool canAssign) {
@@ -704,8 +712,8 @@ static void unary(bool canAssign) {
 // {NULL, NULL, PREC_NONE} なエントリは, そのトークンは式では使用されない字句であることを示している.
 ParseRule rules[] = {
 /* Compiling Expressions rules < Calls and Functions infix-left-paren */
-    [TOKEN_LEFT_PAREN]    = {grouping, call, PREC_CALL},
-    [TOKEN_RIGHT_PAREN]   = {NULL, NULL, PREC_NONE},
+    [TOKEN_LEFT_PAREN]    = {grouping, call, PREC_CALL}, // パーサーが式に続いて`(`を発見するとそれは関数CALL演算子である.
+    [TOKEN_RIGHT_PAREN]   = {NULL, NULL, PREC_NONE}, // )
     [TOKEN_LEFT_BRACE]    = {NULL, NULL, PREC_NONE}, // [big]
     [TOKEN_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
     [TOKEN_COMMA]         = {NULL, NULL, PREC_NONE},
@@ -810,15 +818,16 @@ static void block() {
   consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
 }
 
+// function は関数をコンパイルする.
 static void function(FunctionType type) {
   Compiler compiler;
   initCompiler(&compiler, type);
   beginScope(); // [no-end-scope]
 
   consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
-  if (!check(TOKEN_RIGHT_PAREN)) {
+  if (!check(TOKEN_RIGHT_PAREN)) { // ) がなければ, 関数には引数がある.
     do {
-      current->function->arity++;
+      current->function->arity++; // 引数の数をインクリメント.
       if (current->function->arity > 255) {
         errorAtCurrent("Can't have more than 255 parameters.");
       }
@@ -828,6 +837,7 @@ static void function(FunctionType type) {
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
   consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
+  // 関数本体の処理をコンパイル
   block();
 
   ObjFunction *function = endCompiler();
@@ -905,9 +915,12 @@ static void classDeclaration() {
   currentClass = currentClass->enclosing;
 }
 
+// funDeclaration は関数宣言を解析する.
 static void funDeclaration() {
+  // loxでは関数はファーストクラスの値なので, 関数宣言は変数を作成しその中に定義を格納するという処理になる.
+  // トップレベルならグローバル変数, それ以外ならローカル変数に関数を格納する.
   uint8_t global = parseVariable("Expect function name.");
-  markInitialized();
+  markInitialized(); // 関数定義内で自分自身を参照(再起関数の定義)ができるように, 解析前に初期化済みフラグを付与しておく
   function(TYPE_FUNCTION);
   defineVariable(global);
 }
@@ -1081,6 +1094,7 @@ static void declaration() {
   if (match(TOKEN_CLASS)) {
     classDeclaration();
   } else if (match(TOKEN_FUN)) {
+    // 関数宣言
     funDeclaration();
   } else if (match(TOKEN_VAR)) {
     // 変数制限の解析
