@@ -34,9 +34,10 @@ static void runtimeError(const char *format, ...) {
   size_t instruction = frame->ip - frame->function->chunk.code - 1;
   int line = frame->function->chunk.lines[instruction];
 */
+  // CallStackを呼び出し元まで辿ってエラーメッセージを有用なものにする.
   for (int i = vm.frameCount - 1; i >= 0; i--) {
     CallFrame *frame = &vm.frames[i];
-/* Calls and Functions runtime-error-stack < Closures runtime-error-function
+/*
     ObjFunction* function = frame->function;
 */
     ObjFunction *function = frame->closure->function;
@@ -101,18 +102,18 @@ Value pop() {
   return *vm.stackTop;
 }
 
-// peek はグローバル変数vmのスタックを先頭から引数して指定された箇所の値を返す
+// peek はlox仮想マシンのスタックを先頭から引数で指定された箇所の値を返す
 static Value peek(int distance) {
   // 先頭のスタックポインタは常に一つ先の空の領域を指しているので, -1 して先頭の値からカウントさせる.
   return vm.stackTop[-1 - distance];
 }
 
-/* Calls and Functions call < Closures call-signature
+/* 関数へのポインタと引数の数が渡される
 static bool call(ObjFunction* function, int argCount) {
 */
 static bool call(ObjClosure *closure, int argCount) {
-/* Calls and Functions check-arity < Closures check-arity
-  if (argCount != function->arity) {
+/*
+  if (argCount != function->arity) { // 引数の数チェック
     runtimeError("Expected %d arguments but got %d.",
         function->arity, argCount);
 */
@@ -128,16 +129,20 @@ static bool call(ObjClosure *closure, int argCount) {
   }
 
   CallFrame *frame = &vm.frames[vm.frameCount++];
-/* Calls and Functions call < Closures call-init-closure
+/* 呼び出された関数オブジェクトでスタックトップの CallFrame を更新する
   frame->function = function;
   frame->ip = function->chunk.code;
 */
   frame->closure = closure;
   frame->ip = closure->function->chunk.code;
+  // スタックトップから (引数の数 + 1(関数オブジェクトの分)) したアドレスを CallFrame の先頭に設定する.
+  // そうすると CallFrame の先頭は関数オブジェクトが slots[0] で参照できる.
+  // よって引数は slots[1] から始まる.
   frame->slots = vm.stackTop - argCount - 1;
   return true;
 }
 
+// callValue は値に対して`()`演算子が呼ばれたときの処理を行う.
 static bool callValue(Value callee, int argCount) {
   if (IS_OBJ(callee)) {
     switch (OBJ_TYPE(callee)) {
@@ -162,9 +167,9 @@ static bool callValue(Value callee, int argCount) {
       }
       case OBJ_CLOSURE:
         return call(AS_CLOSURE(callee), argCount);
-/* Calls and Functions call-value < Closures call-value-closure
-      case OBJ_FUNCTION: // [switch]
-        return call(AS_FUNCTION(callee), argCount);
+/*
+      case OBJ_FUNCTION:
+        return call(AS_FUNCTION(callee), argCount); // 関数呼び出し処理
 */
       case OBJ_NATIVE: {
         NativeFn native = AS_NATIVE(callee);
@@ -545,11 +550,16 @@ static InterpretResult run() {
         frame->ip -= offset;
         break;
       }
+      // 関数の呼び出し命令.
       case OP_CALL: {
         int argCount = READ_BYTE();
+        // VMのスタックの先頭に引数が積まれているので argCount の数だけ peek した箇所に関数が収められている.
+        // その関数を callValue にわたす.
         if (!callValue(peek(argCount), argCount)) {
           return INTERPRET_RUNTIME_ERROR;
         }
+        // 関数呼び出しに成功した場合VMのスタックに新しいCallFrameが積まれている.
+        // それを現在実行している frame として更新する.
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -592,27 +602,22 @@ static InterpretResult run() {
         closeUpvalues(vm.stackTop - 1);
         pop();
         break;
+      // 関数からの復帰命令
       case OP_RETURN: {
-/* A Virtual Machine print-return < Global Variables op-return
-        printValue(pop());
-        printf("\n");
-*/
-/* Global Variables op-return < Calls and Functions interpret-return
-        // Exit interpreter.
-*/
-/* A Virtual Machine run < Calls and Functions interpret-return
-        return INTERPRET_OK;
-*/
-        Value result = pop();
+        Value result = pop(); // 関数の実行結果を取得
         closeUpvalues(frame->slots);
+        // CallFrame の破棄
         vm.frameCount--;
         if (vm.frameCount == 0) {
+          // トップレベルのCallFrameの終了 = プログラム全体の終了
           pop();
           return INTERPRET_OK;
         }
 
+        // 呼び終わった関数のCallFrame先頭をスタックトップに更新 = CallFrame が積んでいた値を破棄する.
         vm.stackTop = frame->slots;
-        push(result);
+        push(result); // 関数の結果を先頭に積む
+        // 現在実行中の CallFrame を更新する
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }
@@ -664,8 +669,8 @@ InterpretResult interpret(const char *source) {
   frame->ip = function->chunk.code;               // 命令ポインタを関数チャンクの先頭に設定.
   frame->slots = vm.stack;                        // Stackの先頭アドレスを関数のslotsに設定.
 */
-/* Calls and Functions interpret < Closures interpret
-  call(function, 0);
+/*
+  call(function, 0); // 暗黙的に定義された _main を呼び出す.
 */
   ObjClosure *closure = newClosure(function);
   pop();
