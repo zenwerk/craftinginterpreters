@@ -75,6 +75,7 @@ ObjInstance *newInstance(ObjClass *klass) {
   return instance;
 }
 
+// newNative はC言語ネイティブ関数を扱う構造体を返す
 ObjNative *newNative(NativeFn function) {
   ObjNative *native = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
   native->function = function;

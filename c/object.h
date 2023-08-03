@@ -57,6 +57,7 @@ typedef struct {
 
 typedef Value (*NativeFn)(int argCount, Value *args);
 
+// ObjNative はC言語で実装された関数を表す
 typedef struct {
   Obj obj;
   NativeFn function;

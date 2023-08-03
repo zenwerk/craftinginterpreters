@@ -171,11 +171,14 @@ static bool callValue(Value callee, int argCount) {
       case OBJ_FUNCTION:
         return call(AS_FUNCTION(callee), argCount); // 関数呼び出し処理
 */
+      // Cネイティブ実装関数の処理
       case OBJ_NATIVE: {
         NativeFn native = AS_NATIVE(callee);
+        // C言語実装なのでスタックなどを経由せず直接実行する
         Value result = native(argCount, vm.stackTop - argCount);
+        // ネイティブ関数のために積まれたスタックを破棄
         vm.stackTop -= argCount + 1;
-        push(result);
+        push(result); // 結果をPUSH
         return true;
       }
       default:
