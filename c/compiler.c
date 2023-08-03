@@ -1029,18 +1029,21 @@ static void printStatement() {
   emitByte(OP_PRINT);
 }
 
+// returnStatement は return文を解析する.
 static void returnStatement() {
   if (current->type == TYPE_SCRIPT) {
     error("Can't return from top-level code.");
   }
 
   if (match(TOKEN_SEMICOLON)) {
+    // return; の場合は暗黙的returnと同じ処理.
     emitReturn();
   } else {
     if (current->type == TYPE_INITIALIZER) {
       error("Can't return a value from an initializer.");
     }
 
+    // 返り値のがある場合はそれをPUSHしたあとに0P_RETURN.
     expression();
     consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
     emitByte(OP_RETURN);
