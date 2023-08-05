@@ -69,12 +69,14 @@ struct ObjString {
   char *chars; // 実際の文字列
   uint32_t hash; // 文字列のハッシュ値(毎回計算する必要がないようにメモ化しておく)
 };
+
 typedef struct ObjUpvalue {
   Obj obj;
   Value *location;
   Value closed;
   struct ObjUpvalue *next;
 } ObjUpvalue;
+
 typedef struct {
   Obj obj;
   ObjFunction *function;
