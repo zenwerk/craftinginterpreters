@@ -20,10 +20,7 @@
 // - 呼び出されたCallFrameがReturnしたとき, 呼び出した側の CallFrame の *ip から動作を再開すればよい.
 // - よって呼び出し側CFの *ip がリターンアドレスと同じ意味をもつ.
 typedef struct {
-/* Calls and Functions call-frame < Closures call-frame-closure
-  ObjFunction* function; // 呼び出される関数へのポインタ
-*/
-  ObjClosure *closure;
+  ObjClosure *closure; // 呼び出されるクロージャ(関数)へのポインタ
   uint8_t *ip;  // 命令ポインタ(現在のバイトコード命令のアドレスを指す) -> 実行中のプログラムの「現在地」とも言える.
   Value *slots; // この関数が使用できる最初のスロット `VM{Value stack[];}` の Valueポインタで指す.
 } CallFrame;

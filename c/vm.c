@@ -37,9 +37,6 @@ static void runtimeError(const char *format, ...) {
   // CallStackを呼び出し元まで辿ってエラーメッセージを有用なものにする.
   for (int i = vm.frameCount - 1; i >= 0; i--) {
     CallFrame *frame = &vm.frames[i];
-/*
-    ObjFunction* function = frame->function;
-*/
     ObjFunction *function = frame->closure->function;
     size_t instruction = frame->ip - function->chunk.code - 1;
     fprintf(stderr, "[line %d] in ", // [minus]
@@ -108,16 +105,9 @@ static Value peek(int distance) {
   return vm.stackTop[-1 - distance];
 }
 
-/* 関数へのポインタと引数の数が渡される
-static bool call(ObjFunction* function, int argCount) {
-*/
+// クロージャ(関数)へのポインタと引数の数が渡される
 static bool call(ObjClosure *closure, int argCount) {
-/*
-  if (argCount != function->arity) { // 引数の数チェック
-    runtimeError("Expected %d arguments but got %d.",
-        function->arity, argCount);
-*/
-  if (argCount != closure->function->arity) {
+  if (argCount != closure->function->arity) { // 引数の数チェック
     runtimeError("Expected %d arguments but got %d.",
                  closure->function->arity, argCount);
     return false;
@@ -129,10 +119,7 @@ static bool call(ObjClosure *closure, int argCount) {
   }
 
   CallFrame *frame = &vm.frames[vm.frameCount++];
-/* 呼び出された関数オブジェクトでスタックトップの CallFrame を更新する
-  frame->function = function;
-  frame->ip = function->chunk.code;
-*/
+  // 呼び出されたクロージャ(関数)オブジェクトでスタックトップの CallFrame を更新する
   frame->closure = closure;
   frame->ip = closure->function->chunk.code;
   // スタックトップから (引数の数 + 1(関数オブジェクトの分)) したアドレスを CallFrame の先頭に設定する.
@@ -165,12 +152,9 @@ static bool callValue(Value callee, int argCount) {
         }
         return true;
       }
+      // クロージャ対応のためすべての関数はOBJ_CLOSUREにラップされる
       case OBJ_CLOSURE:
         return call(AS_CLOSURE(callee), argCount);
-/*
-      case OBJ_FUNCTION:
-        return call(AS_FUNCTION(callee), argCount); // 関数呼び出し処理
-*/
       // Cネイティブ実装関数の処理
       case OBJ_NATIVE: {
         NativeFn native = AS_NATIVE(callee);
@@ -302,18 +286,11 @@ static InterpretResult run() {
   CallFrame *frame = &vm.frames[vm.frameCount - 1];
 
 #define READ_BYTE() (*frame->ip++)
-/*
-#define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
-*/
 
 #define READ_SHORT() \
     (frame->ip += 2, \
     (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
 
-/* Calls and Functions run < Closures read-constant
-#define READ_CONSTANT() \
-    (frame->function->chunk.constants.values[READ_BYTE()])
-*/
 #define READ_CONSTANT() \
     (frame->closure->function->chunk.constants.values[READ_BYTE()])
 
@@ -665,6 +642,7 @@ InterpretResult interpret(const char *source) {
   ObjFunction *function = compile(source);
   if (function == NULL) return INTERPRET_COMPILE_ERROR;
 
+  // スクリプトをコンパイルするとき, まだRAWの関数オブジェクトを返す
   push(OBJ_VAL(function));
 /*
   CallFrame* frame = &vm.frames[vm.frameCount++]; // 先頭の CallFrame[0] を最初の関数に設定.
@@ -672,13 +650,11 @@ InterpretResult interpret(const char *source) {
   frame->ip = function->chunk.code;               // 命令ポインタを関数チャンクの先頭に設定.
   frame->slots = vm.stack;                        // Stackの先頭アドレスを関数のslotsに設定.
 */
-/*
-  call(function, 0); // 暗黙的に定義された _main を呼び出す.
-*/
-  ObjClosure *closure = newClosure(function);
-  pop();
-  push(OBJ_VAL(closure));
-  call(closure, 0);
+
+  ObjClosure *closure = newClosure(function); // VMが実行する前にRAW関数オブジェクトをクロージャOBJでラップする
+  pop(); // RAW関数オブジェクトはもういらないのでPOP
+  push(OBJ_VAL(closure)); // クロージャオブジェクトをPUSH
+  call(closure, 0); // 暗黙的に定義された _main を呼び出す.
 
 /* Compiling Expressions interpret-chunk < Calls and Functions end-interpret
   InterpretResult result = run();
