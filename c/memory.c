@@ -144,6 +144,7 @@ static void freeObject(Obj *object) {
       break;
     } // [braces]
     case OBJ_CLOSURE: {
+      // クロージャ関数はラップしている関数までは解放しないことに注意.
       ObjClosure *closure = (ObjClosure *) object;
       FREE_ARRAY(ObjUpvalue*, closure->upvalues,
                  closure->upvalueCount);

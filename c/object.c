@@ -44,6 +44,8 @@ ObjClass *newClass(ObjString *name) {
   return klass;
 }
 
+// newClosure は新しいクロージャ関数オブジェクトを生成して返す.
+// ラップする関数へのポインタを引数で受け取る.
 ObjClosure *newClosure(ObjFunction *function) {
   ObjUpvalue **upvalues = ALLOCATE(ObjUpvalue*,
                                    function->upvalueCount);

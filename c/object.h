@@ -47,6 +47,7 @@ struct Obj {
 
 // ObjFunction はコンパイルされた関数のChunkを保存する構造体.
 // 関数の実行時表現.
+// また, 関数宣言の"RAW"な __コンパイル時__ の状態を表す.
 typedef struct {
   Obj obj;           // 言語内でファーストクラスの扱うを受けるものは Obj を継承(?)しなければならない.
   int arity;         // 関数が受け取る引数の数
@@ -77,9 +78,10 @@ typedef struct ObjUpvalue {
   struct ObjUpvalue *next;
 } ObjUpvalue;
 
+// ObjClosure は閉包関数を表す.
 typedef struct {
   Obj obj;
-  ObjFunction *function;
+  ObjFunction *function; // 実行される関数への参照.
   ObjUpvalue **upvalues;
   int upvalueCount;
 } ObjClosure;
