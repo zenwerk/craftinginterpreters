@@ -441,13 +441,15 @@ static uint8_t parseVariable(const char *errorMessage) {
   return identifierConstant(&parser.previous);
 }
 
+// markInitialized は現在解析中の宣言された変数を初期化済みとしてマークする
 static void markInitialized() {
   // コンパイラがトップレベルを解析中なら, それはグローバル変数なので何もしない
   // lox ではグローバル変数はlate binding なので実行時に初期化済みであれば問題ない仕様のため.
   if (current->scopeDepth == 0)
     return;
 
-  // 変数が定義されたスコープ(その変数を所有するスコープ)の深度を記録する
+  // 変数が定義されたスコープ(その変数を所有するスコープ)の深さを記録する.
+  // この depth の値が -1 なら初期化済みというマークとなる.
   current->locals[current->localCount - 1].depth = current->scopeDepth;
 }
 
