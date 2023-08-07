@@ -51,7 +51,7 @@ struct Obj {
 typedef struct {
   Obj obj;           // 言語内でファーストクラスの扱うを受けるものは Obj を継承(?)しなければならない.
   int arity;         // 関数が受け取る引数の数
-  int upvalueCount;
+  int upvalueCount;  // キャプチャしたクロージャ変数の数. 実行時に必要なため Compiler ではなく ObjFunction 側で保持する.
   Chunk chunk;       // 関数本体のバイトコード
   ObjString *name;   // 関数名
 } ObjFunction;

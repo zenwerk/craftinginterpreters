@@ -52,8 +52,9 @@ typedef struct {
   bool isCaptured;
 } Local;
 
+// Upvalue はクロージャにキャプチャされた変数を表す
 typedef struct {
-  uint8_t index;
+  uint8_t index; // 閉包された変数のlocalsインデックスを追跡する. そうすることで、コンパイラは、囲んでいる関数内のどの変数をキャプチャする必要があるかを認識する.
   bool isLocal;
 } Upvalue;
 
@@ -65,8 +66,8 @@ typedef enum {
   TYPE_SCRIPT // トップレベルのコード
 } FunctionType;
 
-// コンパイラを表す構造体.
-// この構造体が管理するものは
+// コンパイラを表す構造体. 最終的にこの構造体は関数をコンパイルする毎に生成される.
+// この構造体が管理するものは,
 // - コンパイルしている関数
 // - ローカル変数
 // - スコープの深さ
@@ -79,7 +80,7 @@ typedef struct Compiler {
   // 一つのブロックに登録できるローカル変数は UINT8_COUNT 個まで, という制限が生まれる.
   Local locals[UINT8_COUNT];     // どのスタックスロットがどのローカル変数やテンポラリに関連付けられているかを追跡する.
   int localCount;                // スコープ内にローカル変数が何個があるか, つまりlocals配列がいくつ使用中であるかを示す変数.
-  Upvalue upvalues[UINT8_COUNT];
+  Upvalue upvalues[UINT8_COUNT]; // 関数のボディで解決されたクロージャ変数を追跡するための配列.
   int scopeDepth;                // スコープの深さ, つまり現在コンパイル中のコードがいくつ {} で囲まれているかを示す.
 } Compiler;
 
@@ -329,6 +330,8 @@ static bool identifiersEqual(Token *a, Token *b) {
   return memcmp(a->start, b->start, a->length) == 0;
 }
 
+// resolveLocal は指定された名前のローカル変数を探しlocals配列のidxを返す.
+// 見つからない場合は -1 を返す.
 static int resolveLocal(Compiler *compiler, Token *name) {
   // コンパイラ構造体に登録されているローカル変数をなめる.
   // 末尾からループすることでスコープ外の同名の変数をシャドーイングできる.
@@ -349,12 +352,15 @@ static int resolveLocal(Compiler *compiler, Token *name) {
   return -1;
 }
 
+// addUpvalue はクロージャで閉包された値(upvalue)を作成する.
 static int addUpvalue(Compiler *compiler, uint8_t index,
                       bool isLocal) {
   int upvalueCount = compiler->function->upvalueCount;
 
+  // すでに登録済みのクロージャ変数かどうか確認し, 登録済みならそのidxを返す
   for (int i = 0; i < upvalueCount; i++) {
     Upvalue *upvalue = &compiler->upvalues[i];
+    // すでに登録済みの Upvalue と同じ値か比較する
     if (upvalue->index == index && upvalue->isLocal == isLocal) {
       return i;
     }
@@ -365,17 +371,23 @@ static int addUpvalue(Compiler *compiler, uint8_t index,
     return 0;
   }
 
+  // 新しい upValue を登録する
   compiler->upvalues[upvalueCount].isLocal = isLocal;
   compiler->upvalues[upvalueCount].index = index;
   return compiler->function->upvalueCount++;
 }
 
+// resolveUpvalue は外部のブロックで定義されている(かもしれない)変数を探しに行く
+// クロージャ関数を実現するために必要な処理.
+// 見つかった場合は該当する Compiler 構造体の locals の idx を, そうでなければ -1 を返す.
+// 返り値は OP_{GET,SET}_UPVALUE 命令のオペランドとなる.
 static int resolveUpvalue(Compiler *compiler, Token *name) {
   if (compiler->enclosing == NULL) return -1;
 
+  // 一つ外側のCompiler構造体に変数が locals に登録されているか調べる
   int local = resolveLocal(compiler->enclosing, name);
   if (local != -1) {
-    compiler->enclosing->locals[local].isCaptured = true;
+    compiler->enclosing->locals[local].isCaptured = true; // クロージャにキャプチャされたフラグをON.
     return addUpvalue(compiler, (uint8_t) local, true);
   }
 
@@ -617,14 +629,16 @@ static void namedVariable(Token name, bool canAssign) {
   // arg はバイトコードにemitされるオペランド.
   // 値は指定されたコンパイラ構造体の locals配列のインデックス.
   int arg = resolveLocal(current, &name);
-  // -1 はローカル変数には登録されていない名前である = グローバル変数である
   if (arg != -1) {
+    // locals配列のidxが -1 ではないならローカル変数
     getOp = OP_GET_LOCAL;
     setOp = OP_SET_LOCAL;
   } else if ((arg = resolveUpvalue(current, &name)) != -1) {
+    // クロージャ変数である可能性を考え, 外部ブロックの変数を探してキャプチャしにいく
     getOp = OP_GET_UPVALUE;
     setOp = OP_SET_UPVALUE;
   } else {
+    // -1 はローカル変数には登録されていない名前である = グローバル変数である
     arg = identifierConstant(&name);
     getOp = OP_GET_GLOBAL;
     setOp = OP_SET_GLOBAL;
