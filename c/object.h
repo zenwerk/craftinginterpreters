@@ -71,9 +71,10 @@ struct ObjString {
   uint32_t hash; // 文字列のハッシュ値(毎回計算する必要がないようにメモ化しておく)
 };
 
+// upvalue のランタイム表現
 typedef struct ObjUpvalue {
   Obj obj;
-  Value *location;
+  Value *location; // キャプチャした変数への参照
   Value closed;
   struct ObjUpvalue *next;
 } ObjUpvalue;

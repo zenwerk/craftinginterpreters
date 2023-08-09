@@ -173,6 +173,7 @@ static void freeObject(Obj *object) {
       break;
     }
     case OBJ_UPVALUE:
+      // 複数のクロージャ関数から参照されている可能性もあるため, キャプチャした変数は開放しない.
       FREE(ObjUpvalue, object);
       break;
   }
