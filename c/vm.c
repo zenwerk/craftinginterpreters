@@ -216,6 +216,8 @@ static bool bindMethod(ObjClass *klass, ObjString *name) {
   return true;
 }
 
+// captureUpvalue はOP_CLOSUREの初期化中に呼ばれる関数で,
+// isLocal=trueなクロージャ変数を取得する処理.
 static ObjUpvalue *captureUpvalue(Value *local) {
   ObjUpvalue *prevUpvalue = NULL;
   ObjUpvalue *upvalue = vm.openUpvalues;
@@ -228,6 +230,7 @@ static ObjUpvalue *captureUpvalue(Value *local) {
     return upvalue;
   }
 
+  // 新しいupValueオブジェクトを生成.
   ObjUpvalue *createdUpvalue = newUpvalue(local);
   createdUpvalue->next = upvalue;
 
@@ -566,13 +569,17 @@ static InterpretResult run() {
         ObjFunction *function = AS_FUNCTION(READ_CONSTANT());
         ObjClosure *closure = newClosure(function);
         push(OBJ_VAL(closure));
+        // upvalueCount のぶんだけオペランドバイトコードを読み込む.
         for (int i = 0; i < closure->upvalueCount; i++) {
           uint8_t isLocal = READ_BYTE();
           uint8_t index = READ_BYTE();
           if (isLocal) {
+            // isLocal=true ならば「現在実行中のCallFrame」で宣言された関数がそのCallFrameで宣言された変数をキャプチャしているので,
+            // frame->slots+index に位置にある変数をcaptureUpvalueでキャプチャする.
             closure->upvalues[i] =
                 captureUpvalue(frame->slots + index);
           } else {
+            // isLocal=falseは更に外部のスコープにある変数キャプチャなのでupvaluesのindexから参照チェーンを取得しておく
             closure->upvalues[i] = frame->closure->upvalues[index];
           }
         }

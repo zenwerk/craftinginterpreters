@@ -49,6 +49,7 @@ ObjClass *newClass(ObjString *name) {
 ObjClosure *newClosure(ObjFunction *function) {
   ObjUpvalue **upvalues = ALLOCATE(ObjUpvalue*,
                                    function->upvalueCount);
+  // キャプチャしたupvalueの数だけアドレスを初期化.
   for (int i = 0; i < function->upvalueCount; i++) {
     upvalues[i] = NULL;
   }

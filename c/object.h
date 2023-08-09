@@ -83,7 +83,7 @@ typedef struct ObjUpvalue {
 typedef struct {
   Obj obj;
   ObjFunction *function; // 実行される関数への参照.
-  ObjUpvalue **upvalues;
+  ObjUpvalue **upvalues; // キャプチャした変数への参照は一つとは限らないのでダブルポインタで動的配列で確保.
   int upvalueCount;
 } ObjClosure;
 
