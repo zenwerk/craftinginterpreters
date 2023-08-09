@@ -353,6 +353,7 @@ static int resolveLocal(Compiler *compiler, Token *name) {
 }
 
 // addUpvalue はクロージャで閉包された値(upvalue)を作成する.
+// isLocalフラグは外側関数の変数をキャプチャしているのかどうかを表す.
 static int addUpvalue(Compiler *compiler, uint8_t index,
                       bool isLocal) {
   int upvalueCount = compiler->function->upvalueCount;
@@ -382,17 +383,23 @@ static int addUpvalue(Compiler *compiler, uint8_t index,
 // 見つかった場合は該当する Compiler 構造体の locals の idx を, そうでなければ -1 を返す.
 // 返り値は OP_{GET,SET}_UPVALUE 命令のオペランドとなる.
 static int resolveUpvalue(Compiler *compiler, Token *name) {
-  if (compiler->enclosing == NULL) return -1;
+  if (compiler->enclosing == NULL) return -1; // 再起の終了条件 == トップレベルに到達した
 
-  // 一つ外側のCompiler構造体に変数が locals に登録されているか調べる
+  // 関数を囲んでいる(一つ外側のCompiler構造体に)変数が locals に登録されているか調べる
   int local = resolveLocal(compiler->enclosing, name);
   if (local != -1) {
     compiler->enclosing->locals[local].isCaptured = true; // クロージャにキャプチャされたフラグをON.
+    // 外側を囲んでいる関数なら isLocal=true で upvalue として登録 = 一つ外側にある変数である
     return addUpvalue(compiler, (uint8_t) local, true);
   }
 
+  // 変数が見つかるまでさらに外側の関数のlocalsを再帰して検索していく.
   int upvalue = resolveUpvalue(compiler->enclosing, name);
   if (upvalue != -1) {
+    // resolveUpvalue の返り値で発見されたアドレス(idx)は間接的な参照値の扱いである.
+    // よって isLocal=false.
+    // see: https://www.craftinginterpreters.com/closures.html#flattening-upvalues
+    // see: https://www.craftinginterpreters.com/image/closures/linked-upvalues.png
     return addUpvalue(compiler, (uint8_t) upvalue, false);
   }
 
@@ -853,18 +860,18 @@ static void function(FunctionType type) {
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
   consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
+
   // 関数本体の処理をコンパイル
   block();
 
   ObjFunction *function = endCompiler();
-/* Calls and Functions compile-function < Closures emit-closure
-  emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(function)));
-*/
-  emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
 
+  // クロージャ関数シンボルを定数Chunkに登録してemit.
+  emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+  // 可変長のupValueオペランド(2*n Bytes)が続く
   for (int i = 0; i < function->upvalueCount; i++) {
-    emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
-    emitByte(compiler.upvalues[i].index);
+    emitByte(compiler.upvalues[i].isLocal ? 1 : 0); // isLocal かどうか
+    emitByte(compiler.upvalues[i].index);           // upValue の idx 値
   }
 }
 
