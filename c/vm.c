@@ -252,13 +252,16 @@ static ObjUpvalue *captureUpvalue(Value *local) {
   return createdUpvalue;
 }
 
+// closeUpvaluesはクロージャにキャプチャされた変数をヒープに退避させる.
+// see: https://www.craftinginterpreters.com/image/closures/closing.png
 static void closeUpvalues(Value *last) {
+  // 破棄される変数より大きいアドレスはcloseの対象.
   while (vm.openUpvalues != NULL &&
          vm.openUpvalues->location >= last) {
     ObjUpvalue *upvalue = vm.openUpvalues;
-    upvalue->closed = *upvalue->location;
-    upvalue->location = &upvalue->closed;
-    vm.openUpvalues = upvalue->next;
+    upvalue->closed = *upvalue->location; // upvalueが現在指している値をデリファレンスして取得
+    upvalue->location = &upvalue->closed; // 値の参照先を自身のclosedフィールドのアドレスに更新する.
+    vm.openUpvalues = upvalue->next; // close されたので openUpvalues から除外
   }
 }
 
@@ -594,6 +597,9 @@ static InterpretResult run() {
         }
         break;
       }
+      // キャプチャされた変数をヒープに退避させる命令.
+      // コンパイラはブロックの終端に達するたび(関数定義除く)そのブロック内のすべてのローカル変数を破棄しクローズされた各ローカル変数に対して,
+      // OP_CLOSE_UPVALUE を出力しなければならない.
       case OP_CLOSE_UPVALUE:
         closeUpvalues(vm.stackTop - 1);
         pop();
@@ -601,7 +607,7 @@ static InterpretResult run() {
       // 関数からの復帰命令
       case OP_RETURN: {
         Value result = pop(); // 関数の実行結果を取得
-        closeUpvalues(frame->slots);
+        closeUpvalues(frame->slots); // 関数内部で定義された変数(引数含む)も正しくCLOSEされなければならない(入れ子関数定義でクロージャにキャプチャされる可能性がある).
         // CallFrame の破棄
         vm.frameCount--;
         if (vm.frameCount == 0) {

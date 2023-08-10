@@ -41,7 +41,7 @@ typedef struct {
   Table globals; // グローバル変数
   Table strings; // 文字列プール
   ObjString *initString;
-  ObjUpvalue *openUpvalues;
+  ObjUpvalue *openUpvalues; // スタック上の変数を指す,すべてのOpenなクロージャ変数(の連結リストの先頭アドレス)
 
   size_t bytesAllocated; // 確保したメモリ領域
   size_t nextGC; // 次GCを起動するときのサイズ

@@ -75,7 +75,7 @@ struct ObjString {
 typedef struct ObjUpvalue {
   Obj obj;
   Value *location; // キャプチャした変数への参照
-  Value closed;
+  Value closed; // upvalueがクローズされた際に値を保持しておくためのフィールド
   struct ObjUpvalue *next; // 連結リストでメモリアドレス順になるよう管理する
 } ObjUpvalue;
 
