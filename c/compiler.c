@@ -49,7 +49,7 @@ typedef struct {
 typedef struct {
   Token name; // ローカル変数名
   int depth;  // ローカル変数が宣言されたブロックのスコープ深度
-  bool isCaptured;
+  bool isCaptured; // クロージャ関数にキャプチャされているか？
 } Local;
 
 // Upvalue はクロージャにキャプチャされた変数を表す
@@ -301,6 +301,8 @@ static void endScope() {
   while (current->localCount > 0 &&
          current->locals[current->localCount - 1].depth > current->scopeDepth) {
     if (current->locals[current->localCount - 1].isCaptured) {
+      // クロージャにキャプチャされた変数はスタックからの開放時にヒープに退避させる特別な命令を発行する.
+      // なお命令発行時, 対象の変数はスタックトップにあるのでオペランドは不要.
       emitByte(OP_CLOSE_UPVALUE);
     } else {
       // ローカル変数をスタックからPOPして破棄する.
@@ -388,7 +390,7 @@ static int resolveUpvalue(Compiler *compiler, Token *name) {
   // 関数を囲んでいる(一つ外側のCompiler構造体に)変数が locals に登録されているか調べる
   int local = resolveLocal(compiler->enclosing, name);
   if (local != -1) {
-    compiler->enclosing->locals[local].isCaptured = true; // クロージャにキャプチャされたフラグをON.
+    compiler->enclosing->locals[local].isCaptured = true; // 変数がクロージャにキャプチャされたフラグをON.
     // 外側を囲んでいる関数なら isLocal=true で upvalue として登録 = 一つ外側にある変数である
     return addUpvalue(compiler, (uint8_t) local, true);
   }

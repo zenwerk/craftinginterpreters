@@ -218,25 +218,34 @@ static bool bindMethod(ObjClass *klass, ObjString *name) {
 
 // captureUpvalue はOP_CLOSUREの初期化中に呼ばれる関数で,
 // isLocal=trueなクロージャ変数を取得する処理.
+// - 任意のローカル変数に対してObjUpvalueは一つしか存在しないようにしている.
 static ObjUpvalue *captureUpvalue(Value *local) {
   ObjUpvalue *prevUpvalue = NULL;
   ObjUpvalue *upvalue = vm.openUpvalues;
+  // ローカル変数をcloseするときは,リスト内の既存の値がないかをVM管理の連結リストから探す
   while (upvalue != NULL && upvalue->location > local) {
     prevUpvalue = upvalue;
     upvalue = upvalue->next;
   }
 
   if (upvalue != NULL && upvalue->location == local) {
+    // 同じ変数をキャプチャしているupvalueがあるので, それを返す
     return upvalue;
   }
 
   // 新しいupValueオブジェクトを生成.
   ObjUpvalue *createdUpvalue = newUpvalue(local);
+
+  // 新しいupvalueを連結リストに挿入する
   createdUpvalue->next = upvalue;
 
   if (prevUpvalue == NULL) {
+    // リスト内のupvalueすべてが探しているslotの上のlocalsか, もしくはリストが空.
+    // 先頭に追加.
     vm.openUpvalues = createdUpvalue;
   } else {
+    // 現在closeしているslotを過ぎたので, そのslotに対応するupvalueはない.
+    // 挿入
     prevUpvalue->next = createdUpvalue;
   }
 

@@ -76,7 +76,7 @@ typedef struct ObjUpvalue {
   Obj obj;
   Value *location; // キャプチャした変数への参照
   Value closed;
-  struct ObjUpvalue *next;
+  struct ObjUpvalue *next; // 連結リストでメモリアドレス順になるよう管理する
 } ObjUpvalue;
 
 // ObjClosure は閉包関数を表す.
