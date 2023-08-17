@@ -665,6 +665,7 @@ InterpretResult interpret(const char *source) {
   if (function == NULL) return INTERPRET_COMPILE_ERROR;
 
   // スクリプトをコンパイルするとき, まだRAWの関数オブジェクトを返す
+  // NOTE: 関数オブジェクトをわざわざ PUSH/POP しているのはヒープに割り当てられたオブジェクトをGCに認識させるために必要な処理である.
   push(OBJ_VAL(function));
 /*
   CallFrame* frame = &vm.frames[vm.frameCount++]; // 先頭の CallFrame[0] を最初の関数に設定.

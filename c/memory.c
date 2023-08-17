@@ -13,13 +13,13 @@
 
 // reallocate は clox 全体で使用されるメモリ確保ユーティリティ関数.
 // この関数を呼び出すときGCが起動することがある.
-// - newSize = 0 のメモリを解放する.
+// - newSize = 0 のときメモリを解放する.
 void *reallocate(void *pointer, size_t oldSize, size_t newSize) {
-  // GC updated-bytes-allocated
+  // 確保されたヒープメモリのサイズを更新する
   vm.bytesAllocated += newSize - oldSize;
   // GC call-collect
   if (newSize > oldSize) {
-#ifdef DEBUG_STRESS_GC
+#ifdef DEBUG_SRESS_GC  // GCのデバッグ時に有効化する
     collectGarbage();
 #endif
     // しきい値を超えたらGCを起動する
@@ -51,12 +51,12 @@ void markObject(Obj *object) {
 #endif
 
   // GCに追跡された痕跡をマークする
-  // このフラグは黒色に塗りつぶすことを意味しないので注意
+  // 注意:このフラグは黒色に塗りつぶすことを意味しない
   object->isMarked = true;
 
   if (vm.grayCapacity < vm.grayCount + 1) {
     vm.grayCapacity = GROW_CAPACITY(vm.grayCapacity);
-    // 灰色オブジェクトを管理するStackの realloc はOS独自のものを使う.
+    // 灰色オブジェクトを管理するStackの realloc はOS固有のものを直接使う.
     // これはGCのためのスタック伸長時にGCが起動してしまうような状態を避けるため.
     vm.grayStack = (Obj **) realloc(vm.grayStack, sizeof(Obj *) * vm.grayCapacity);
 
@@ -68,7 +68,9 @@ void markObject(Obj *object) {
   vm.grayStack[vm.grayCount++] = object;
 }
 
+// markValue は値が到達可能かチェックする
 void markValue(Value value) {
+  // Obj 以外(数値, bool, nil)は内部的に即値でありヒープに確保されないので IS_OBJ で判別する.
   if (IS_OBJ(value)) markObject(AS_OBJ(value));
 }
 
@@ -85,7 +87,7 @@ static void blackenObject(Obj *object) {
   printValue(OBJ_VAL(object));
   printf("\n");
 #endif
-
+  // オブジェクトの種類ごとにmarkしていく
   switch (object->type) {
     case OBJ_BOUND_METHOD: {
       ObjBoundMethod *bound = (ObjBoundMethod *) object;
@@ -101,7 +103,8 @@ static void blackenObject(Obj *object) {
     }
     case OBJ_CLOSURE: {
       ObjClosure *closure = (ObjClosure *) object;
-      markObject((Obj *) closure->function);
+      markObject((Obj *) closure->function); // 参照していく関数をmark
+      // キャプチャしている upvalues を mark していく
       for (int i = 0; i < closure->upvalueCount; i++) {
         markObject((Obj *) closure->upvalues[i]);
       }
@@ -188,14 +191,15 @@ static void markRoots() {
     markObject((Obj *) vm.frames[i].closure);
   }
 
+  // クロージャにキャプチャされたupvaluesもマークする
   for (ObjUpvalue *upvalue = vm.openUpvalues;
        upvalue != NULL;
        upvalue = upvalue->next) {
     markObject((Obj *) upvalue);
   }
 
-  markTable(&vm.globals);
-  markCompilerRoots();
+  markTable(&vm.globals);  // グローバル変数
+  markCompilerRoots();  // compilerチェーンを辿って関数オブジェクトをmarkしていく
   markObject((Obj *) vm.initString);
 }
 
@@ -221,6 +225,7 @@ static void sweep() {
     } else {
       // 白色オブジェクトである
       Obj *unreached = object;
+      // unreached を連結リストから外す
       object = object->next;
       if (previous != NULL) {
         previous->next = object;
@@ -234,6 +239,7 @@ static void sweep() {
   }
 }
 
+// collectGarbage は mark-sweep GC を開始する起点.
 void collectGarbage() {
 #ifdef DEBUG_LOG_GC
   printf("-- gc begin\n");
@@ -242,6 +248,7 @@ void collectGarbage() {
 
   markRoots();
   traceReferences();
+  // 文字列テーブルはmark終了とsweepが実施される間にチェックする
   tableRemoveWhite(&vm.strings);
   sweep();
 
