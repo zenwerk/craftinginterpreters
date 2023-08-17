@@ -88,8 +88,7 @@ ObjNative *newNative(NativeFn function) {
 /* Strings allocate-string < Hash Tables allocate-string
 static ObjString* allocateString(char* chars, int length) {
 */
-static ObjString *allocateString(char *chars, int length,
-                                 uint32_t hash) {
+static ObjString *allocateString(char *chars, int length, uint32_t hash) {
   ObjString *string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
   string->chars = chars;
@@ -102,6 +101,7 @@ static ObjString *allocateString(char *chars, int length,
   return string;
 }
 
+// hashString は char配列を1byte毎とりだしてハッシュ計算して返す
 static uint32_t hashString(const char *key, int length) {
   uint32_t hash = 2166136261u;
   for (int i = 0; i < length; i++) {
@@ -128,9 +128,10 @@ ObjString *takeString(char *chars, int length) {
 
 ObjString *copyString(const char *chars, int length) {
   uint32_t hash = hashString(chars, length);
-  ObjString *interned = tableFindString(&vm.strings, chars, length,
-                                        hash);
-  if (interned != NULL) return interned;
+  // テーブルに文字列がインターン化されたものがあればそれを返す
+  ObjString *interned = tableFindString(&vm.strings, chars, length, hash);
+  if (interned != NULL)
+    return interned;
 
   char *heapChars = ALLOCATE(char, length + 1);
   memcpy(heapChars, chars, length);

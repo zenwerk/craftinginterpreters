@@ -8,6 +8,7 @@
 
 #define TABLE_MAX_LOAD 0.75
 
+// initTableは引数のハッシュテーブルを初期化する
 void initTable(Table *table) {
   table->count = 0;
   table->capacity = 0;
@@ -89,6 +90,7 @@ static void adjustCapacity(Table *table, int capacity) {
   table->capacity = capacity;
 }
 
+// tableSet は指定したハッシュテーブルに key, value をセットする
 bool tableSet(Table *table, ObjString *key, Value value) {
   if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
     int capacity = GROW_CAPACITY(table->capacity);
@@ -156,6 +158,7 @@ ObjString *tableFindString(Table *table, const char *chars,
   }
 }
 
+// 到達不可能な文字列をインターンテーブルから削除していく
 void tableRemoveWhite(Table *table) {
   for (int i = 0; i < table->capacity; i++) {
     Entry *entry = &table->entries[i];
@@ -165,10 +168,11 @@ void tableRemoveWhite(Table *table) {
   }
 }
 
+// markTable はハッシュテーブルに格納された値に isMarked=true していく.
 void markTable(Table *table) {
   for (int i = 0; i < table->capacity; i++) {
     Entry *entry = &table->entries[i];
-    markObject((Obj *) entry->key);
+    markObject((Obj *) entry->key); // キーとなる文字列もオブジェクトなのでマークする.
     markValue(entry->value);
   }
 }
