@@ -36,8 +36,12 @@ static int simpleInstruction(const char *name, int offset) {
   return offset + 1;
 }
 
-static int byteInstruction(const char *name, Chunk *chunk,
-                           int offset) {
+static int byteInstruction(const char *name, Chunk *chunk, int offset) {
+  // コンパイラーはローカル変数をコンパイルして直接スロットにアクセスできるようにします.
+  // ローカル変数の名前はチャンクに入るためにコンパイラを離れることはない.
+  // これはパフォーマンスにとっては素晴らしいことですがイントロスペクションにとってはあまり良いことではありません.
+  // これらの命令を逆アセンブルする場合グローバルのように変数名を表示することはできません.
+  // 代わりにスロット番号を表示します。
   uint8_t slot = chunk->code[offset + 1];
   printf("%-16s %4d\n", name, slot);
   return offset + 2; // [debug]
